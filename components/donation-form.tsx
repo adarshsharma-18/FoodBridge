@@ -1,14 +1,11 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
-
-import { useState, useEffect } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
-import { useActionState } from "react"
-import { submitDonation, type DonationFormState } from "@/app/actions/donation"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -17,7 +14,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Upload } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Label } from "@/components/ui/label"
 import { MapLocationPicker } from "./map-location-picker"
+import { useAuth } from "@/contexts/auth-context"
+import { createDonation } from "@/lib/donation-service"
 
 const formSchema = z.object({
   foodName: z.string().min(2, {
@@ -41,17 +41,25 @@ const formSchema = z.object({
   longitude: z.string().optional(),
 })
 
-const initialState: DonationFormState = {}
+type FormState = {
+  errors?: {
+    _form?: string[]
+  }
+  success?: boolean
+  message?: string
+}
 
 export function DonationForm() {
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [state, formAction] = useActionState(submitDonation, initialState)
+  const [formState, setFormState] = useState<FormState>({})
   const [location, setLocation] = useState({
     latitude: "",
     longitude: "",
     address: "",
   })
+  const router = useRouter()
+  const { user } = useAuth()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -79,9 +87,45 @@ export function DonationForm() {
     form.setValue("longitude", lng)
   }
 
-  const handleSubmit = (formData: FormData) => {
+  const handleSubmit = async (data: z.infer<typeof formSchema>) => {
+    if (!user) {
+      setFormState({
+        errors: {
+          _form: ["You must be logged in to donate food."],
+        },
+      })
+      return
+    }
+
     setIsSubmitting(true)
-    formAction(formData)
+    setFormState({})
+
+    try {
+      // Create donation in local storage
+      const donation = createDonation({
+        foodName: data.foodName,
+        foodType: data.foodType,
+        quantity: data.quantity,
+        condition: data.condition,
+        address: data.address,
+        donorName: user.name,
+        donorId: user.id,
+        expiryDate: data.expiryDate,
+        latitude: data.latitude,
+        longitude: data.longitude,
+      })
+
+      // Redirect to success page
+      router.push(`/donate/success?id=${donation.id}`)
+    } catch (error) {
+      console.error("Error submitting donation:", error)
+      setFormState({
+        errors: {
+          _form: ["An error occurred while submitting your donation. Please try again."],
+        },
+      })
+      setIsSubmitting(false)
+    }
   }
 
   const nextStep = async () => {
@@ -101,15 +145,6 @@ export function DonationForm() {
   const prevStep = () => {
     setStep(step - 1)
   }
-
-  // Reset form submission state when form is submitted successfully
-  useEffect(() => {
-    if (state.success) {
-      setIsSubmitting(false)
-    } else if (state.errors) {
-      setIsSubmitting(false)
-    }
-  }, [state])
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
@@ -134,17 +169,17 @@ export function DonationForm() {
           </div>
         </div>
 
-        {state.errors?._form && (
+        {formState.errors?._form && (
           <Alert variant="destructive" className="mb-6">
             <AlertDescription>
-              {state.errors._form.map((error) => (
+              {formState.errors._form.map((error) => (
                 <p key={error}>{error}</p>
               ))}
             </AlertDescription>
           </Alert>
         )}
 
-        <form action={handleSubmit} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           {step === 1 && (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -157,7 +192,6 @@ export function DonationForm() {
                 <Label htmlFor="foodName">Food Name</Label>
                 <Input
                   id="foodName"
-                  name="foodName"
                   placeholder="e.g., Cooked Rice, Fresh Vegetables"
                   aria-describedby="foodName-error"
                   {...form.register("foodName")}
@@ -165,13 +199,6 @@ export function DonationForm() {
                 {form.formState.errors.foodName && (
                   <p id="foodName-error" className="text-sm text-red-500">
                     {form.formState.errors.foodName.message}
-                  </p>
-                )}
-                {state.errors?.foodName && (
-                  <p id="foodName-error" className="text-sm text-red-500">
-                    {state.errors.foodName.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
                   </p>
                 )}
               </div>
@@ -194,17 +221,10 @@ export function DonationForm() {
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                <input type="hidden" name="foodType" value={form.getValues("foodType")} />
+                <input type="hidden" {...form.register("foodType")} />
                 {form.formState.errors.foodType && (
                   <p id="foodType-error" className="text-sm text-red-500">
                     {form.formState.errors.foodType.message}
-                  </p>
-                )}
-                {state.errors?.foodType && (
-                  <p id="foodType-error" className="text-sm text-red-500">
-                    {state.errors.foodType.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
                   </p>
                 )}
               </div>
@@ -213,7 +233,6 @@ export function DonationForm() {
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input
                   id="quantity"
-                  name="quantity"
                   placeholder="e.g., 5 kg, 10 packets, serves 20 people"
                   aria-describedby="quantity-error"
                   {...form.register("quantity")}
@@ -223,19 +242,11 @@ export function DonationForm() {
                     {form.formState.errors.quantity.message}
                   </p>
                 )}
-                {state.errors?.quantity && (
-                  <p id="quantity-error" className="text-sm text-red-500">
-                    {state.errors.quantity.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
                 <Label>Food Condition</Label>
                 <RadioGroup
-                  name="condition"
                   defaultValue={form.getValues("condition")}
                   onValueChange={(value) => form.setValue("condition", value as "fresh" | "good" | "staple")}
                   className="flex flex-col space-y-1"
@@ -259,16 +270,9 @@ export function DonationForm() {
                     </Label>
                   </div>
                 </RadioGroup>
-                <input type="hidden" name="condition" value={form.getValues("condition")} />
+                <input type="hidden" {...form.register("condition")} />
                 {form.formState.errors.condition && (
                   <p className="text-sm text-red-500">{form.formState.errors.condition.message}</p>
-                )}
-                {state.errors?.condition && (
-                  <p className="text-sm text-red-500">
-                    {state.errors.condition.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
-                  </p>
                 )}
               </div>
 
@@ -276,7 +280,6 @@ export function DonationForm() {
                 <Label htmlFor="expiryDate">Expiry Date (if applicable)</Label>
                 <Input
                   id="expiryDate"
-                  name="expiryDate"
                   type="date"
                   aria-describedby="expiryDate-error"
                   {...form.register("expiryDate")}
@@ -286,20 +289,12 @@ export function DonationForm() {
                     {form.formState.errors.expiryDate.message}
                   </p>
                 )}
-                {state.errors?.expiryDate && (
-                  <p id="expiryDate-error" className="text-sm text-red-500">
-                    {state.errors.expiryDate.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Additional Details</Label>
                 <Textarea
                   id="description"
-                  name="description"
                   placeholder="Any additional information about the food"
                   className="resize-none"
                   aria-describedby="description-error"
@@ -308,13 +303,6 @@ export function DonationForm() {
                 {form.formState.errors.description && (
                   <p id="description-error" className="text-sm text-red-500">
                     {form.formState.errors.description.message}
-                  </p>
-                )}
-                {state.errors?.description && (
-                  <p id="description-error" className="text-sm text-red-500">
-                    {state.errors.description.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
                   </p>
                 )}
               </div>
@@ -333,7 +321,6 @@ export function DonationForm() {
                 <Label htmlFor="address">Pickup Address</Label>
                 <Input
                   id="address"
-                  name="address"
                   value={location.address}
                   onChange={(e) => {
                     setLocation({ ...location, address: e.target.value })
@@ -348,13 +335,6 @@ export function DonationForm() {
                     {form.formState.errors.address.message}
                   </p>
                 )}
-                {state.errors?.address && (
-                  <p id="address-error" className="text-sm text-red-500">
-                    {state.errors.address.map((error) => (
-                      <span key={error}>{error}</span>
-                    ))}
-                  </p>
-                )}
               </div>
 
               <div className="mt-6">
@@ -365,8 +345,8 @@ export function DonationForm() {
                   initialLat={location.latitude}
                   initialLng={location.longitude}
                 />
-                <input type="hidden" name="latitude" value={location.latitude} />
-                <input type="hidden" name="longitude" value={location.longitude} />
+                <input type="hidden" {...form.register("latitude")} value={location.latitude} />
+                <input type="hidden" {...form.register("longitude")} value={location.longitude} />
               </div>
 
               <div className="mt-4">
@@ -469,4 +449,3 @@ export function DonationForm() {
     </Card>
   )
 }
-

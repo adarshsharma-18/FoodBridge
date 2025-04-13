@@ -103,4 +103,3 @@ export async function submitDonation(prevState: DonationFormState, formData: For
     }
   }
 }
-

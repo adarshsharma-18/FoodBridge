@@ -14,17 +14,15 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Menu, X, User, LogOut, ChevronDown, Bell } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { logout } from "@/app/actions/auth"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/contexts/auth-context"
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [userName, setUserName] = useState("")
-  const [userRole, setUserRole] = useState("")
   const [notificationCount, setNotificationCount] = useState(0)
   const router = useRouter()
+  const { user, logout, isAuthorized, isLoading } = useAuth()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,70 +37,57 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
-  // Check if user is logged in
+  // Set mock notification count based on role
   useEffect(() => {
-    const checkAuth = () => {
-      const token = document.cookie.includes("auth-token=")
-
-      if (token) {
-        // Get user email from cookie
-        const emailCookie = document.cookie.split("; ").find((row) => row.startsWith("user-email="))
-
-        const roleCookie = document.cookie.split("; ").find((row) => row.startsWith("user-role="))
-
-        if (emailCookie) {
-          const email = decodeURIComponent(emailCookie.split("=")[1])
-          // Extract name from email (before @)
-          const name = email.split("@")[0]
-          setUserName(name.charAt(0).toUpperCase() + name.slice(1))
-          setIsLoggedIn(true)
-
-          // Set mock notification count based on role
-          if (roleCookie) {
-            const role = decodeURIComponent(roleCookie.split("=")[1])
-            setUserRole(role)
-            setNotificationCount(role === "ngo" ? 3 : role === "driver" ? 2 : 1)
-          }
-        }
-      } else {
-        setIsLoggedIn(false)
-        setUserName("")
-        setUserRole("")
-        setNotificationCount(0)
-      }
+    if (user) {
+      setNotificationCount(user.role === "ngo" ? 3 : user.role === "driver" ? 2 : 1)
+    } else {
+      setNotificationCount(0)
     }
+  }, [user])
 
-    checkAuth()
+  // Mock notifications based on user role
+  const notifications = user
+    ? [
+        user.role === "donor"
+          ? { id: 1, message: "Your donation has been claimed by Community Food Bank", time: "10 minutes ago" }
+          : user.role === "ngo"
+            ? { id: 1, message: "New food donation available near you", time: "5 minutes ago" }
+            : { id: 1, message: "New pickup assigned to you", time: "15 minutes ago" },
 
-    // Listen for storage events to detect login/logout in other tabs
-    window.addEventListener("storage", checkAuth)
-    return () => window.removeEventListener("storage", checkAuth)
-  }, [])
+        user.role === "ngo"
+          ? { id: 2, message: "Reminder: Pickup scheduled for today at 2 PM", time: "1 hour ago" }
+          : user.role === "driver"
+            ? { id: 2, message: "Delivery confirmed by Food Bank NGO", time: "2 hours ago" }
+            : { id: 2, message: "Your previous donation helped feed 15 people", time: "1 day ago" },
 
-  const handleLogout = async () => {
-    await logout()
-    setIsLoggedIn(false)
-    setUserName("")
-    setUserRole("")
+        user.role === "ngo" && { id: 3, message: "Monthly impact report is now available", time: "2 days ago" },
+      ].filter(Boolean)
+    : []
+
+  const handleLogout = () => {
+    logout()
     router.push("/")
   }
 
-  // Mock notifications based on user role
-  const notifications = [
-    userRole === "donor"
-      ? { id: 1, message: "Your donation has been claimed by Community Food Bank", time: "10 minutes ago" }
-      : userRole === "ngo"
-        ? { id: 1, message: "New food donation available near you", time: "5 minutes ago" }
-        : { id: 1, message: "New pickup assigned to you", time: "15 minutes ago" },
-
-    userRole === "ngo"
-      ? { id: 2, message: "Reminder: Pickup scheduled for today at 2 PM", time: "1 hour ago" }
-      : userRole === "driver"
-        ? { id: 2, message: "Delivery confirmed by Food Bank NGO", time: "2 hours ago" }
-        : { id: 2, message: "Your previous donation helped feed 15 people", time: "1 day ago" },
-
-    userRole === "ngo" && { id: 3, message: "Monthly impact report is now available", time: "2 days ago" },
-  ].filter(Boolean)
+  // Render a simplified navbar during loading
+  if (isLoading) {
+    return (
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          isScrolled ? "bg-white shadow-md py-2" : "bg-transparent py-4"
+        }`}
+      >
+        <div className="container px-4 md:px-6 mx-auto">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="flex items-center">
+              <span className={`text-2xl font-bold ${isScrolled ? "text-green-600" : "text-white"}`}>FoodBridge</span>
+            </Link>
+          </div>
+        </div>
+      </header>
+    )
+  }
 
   return (
     <header
@@ -145,16 +130,22 @@ export function Navbar() {
                 Services <ChevronDown className="ml-1 h-4 w-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>
-                  <Link href="/donate" className="w-full">
-                    Donate Food
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/collect" className="w-full">
-                    Collect Food
-                  </Link>
-                </DropdownMenuItem>
+                {/* Show donation option only for donors or users with both roles */}
+                {(!user || isAuthorized(["donor", "admin"])) && (
+                  <DropdownMenuItem>
+                    <Link href="/donate" className="w-full">
+                      Donate Food
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {/* Show collection option only for NGOs or users with both roles */}
+                {(!user || isAuthorized(["ngo", "admin"])) && (
+                  <DropdownMenuItem>
+                    <Link href="/collect" className="w-full">
+                      Collect Food
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem>
                   <Link href="/track" className="w-full">
                     Track Donations
@@ -165,7 +156,7 @@ export function Navbar() {
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
-            {isLoggedIn ? (
+            {user ? (
               <>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -213,10 +204,10 @@ export function Navbar() {
                     >
                       <Avatar className="h-6 w-6">
                         <AvatarFallback className="bg-green-100 text-green-800 text-xs">
-                          {userName.charAt(0).toUpperCase()}
+                          {user.name.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span>{userName}</span>
+                      <span>{user.name}</span>
                       <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -227,12 +218,8 @@ export function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <form action={logout} className="w-full">
-                        <button type="submit" className="w-full flex items-center text-left">
-                          <LogOut className="mr-2 h-4 w-4" /> Logout
-                        </button>
-                      </form>
+                    <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                      <LogOut className="mr-2 h-4 w-4" /> Logout
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -313,20 +300,26 @@ export function Navbar() {
                   </svg>
                 </summary>
                 <div className="pl-4 mt-2 space-y-2">
-                  <Link
-                    href="/donate"
-                    className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Donate Food
-                  </Link>
-                  <Link
-                    href="/collect"
-                    className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Collect Food
-                  </Link>
+                  {/* Show donation option only for donors or users with both roles */}
+                  {(!user || isAuthorized(["donor", "admin"])) && (
+                    <Link
+                      href="/donate"
+                      className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Donate Food
+                    </Link>
+                  )}
+                  {/* Show collection option only for NGOs or users with both roles */}
+                  {(!user || isAuthorized(["ngo", "admin"])) && (
+                    <Link
+                      href="/collect"
+                      className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      Collect Food
+                    </Link>
+                  )}
                   <Link
                     href="/track"
                     className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
@@ -337,7 +330,7 @@ export function Navbar() {
                 </div>
               </details>
 
-              {isLoggedIn && (
+              {user && (
                 <div className="py-2 border-t border-gray-100">
                   <div className="flex items-center justify-between">
                     <h3 className="font-medium text-gray-700">Notifications</h3>
@@ -354,17 +347,17 @@ export function Navbar() {
                 </div>
               )}
 
-              {isLoggedIn ? (
+              {user ? (
                 <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
                   <div className="flex items-center gap-2 py-2">
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="bg-green-100 text-green-800">
-                        {userName.charAt(0).toUpperCase()}
+                        {user.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">{userName}</p>
-                      <p className="text-xs text-gray-500 capitalize">{userRole}</p>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{user.role}</p>
                     </div>
                   </div>
                   <Button
@@ -377,15 +370,13 @@ export function Navbar() {
                   >
                     <User className="mr-2 h-4 w-4" /> Dashboard
                   </Button>
-                  <form action={logout} className="w-full">
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut className="mr-2 h-4 w-4" /> Logout
-                    </Button>
-                  </form>
+                  <Button
+                    onClick={handleLogout}
+                    variant="outline"
+                    className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Logout
+                  </Button>
                 </div>
               ) : (
                 <div className="flex flex-col space-y-2 pt-2">
@@ -417,4 +408,3 @@ export function Navbar() {
     </header>
   )
 }
-

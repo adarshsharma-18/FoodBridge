@@ -1,9 +1,30 @@
-import { getAvailableDonations } from "@/app/actions/collection"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AvailableDonations } from "@/components/available-donations"
 import DonationFilters from "@/components/donation-filters"
+import { useAuth } from "@/contexts/auth-context"
 
-export default async function CollectPage() {
-  const donations = await getAvailableDonations()
+export default function CollectPage() {
+  const { user, isAuthorized } = useAuth()
+  const router = useRouter()
+
+  // Check if user is authorized to access this page
+  useEffect(() => {
+    if (!user) {
+      router.push("/login?redirect=/collect")
+      return
+    }
+
+    if (!isAuthorized(["ngo", "admin"])) {
+      router.push("/dashboard")
+    }
+  }, [user, isAuthorized, router])
+
+  if (!user || !isAuthorized(["ngo", "admin"])) {
+    return null // Don't render anything while redirecting
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
@@ -19,9 +40,8 @@ export default async function CollectPage() {
 
         <DonationFilters />
 
-        <AvailableDonations donations={donations} />
+        <AvailableDonations />
       </div>
     </div>
   )
 }
-

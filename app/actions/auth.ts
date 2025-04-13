@@ -170,4 +170,3 @@ export async function getUserRole() {
   const role = cookies().get("user-role")
   return role?.value || null
 }
-

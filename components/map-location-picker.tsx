@@ -280,4 +280,3 @@ declare global {
     initMap: () => void
   }
 }
-

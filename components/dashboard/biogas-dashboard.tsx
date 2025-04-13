@@ -527,4 +527,3 @@ export function BiogasDashboard({ userName }: BiogasDashboardProps) {
     </Tabs>
   )
 }
-

@@ -4,21 +4,10 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -26,10 +15,10 @@ import {
   SheetTitle,
   SheetTrigger,
   SheetFooter,
-  SheetClose
+  SheetClose,
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Filter, MapPin, Clock, Package, X } from 'lucide-react'
+import { Filter, MapPin, Clock, Package, X } from "lucide-react"
 
 // Changed to default export
 export default function DonationFilters() {
@@ -42,23 +31,23 @@ export default function DonationFilters() {
 
   const handleApplyFilters = () => {
     const newFilters = []
-    
+
     if (distance[0] !== 10) {
       newFilters.push(`Within ${distance[0]} km`)
     }
-    
+
     if (foodType !== "all") {
       newFilters.push(foodType)
     }
-    
+
     if (expiryTime !== "all") {
       newFilters.push(expiryTime)
     }
-    
+
     if (searchQuery) {
       newFilters.push(`"${searchQuery}"`)
     }
-    
+
     setActiveFilters(newFilters)
     setIsFilterOpen(false)
   }
@@ -72,8 +61,8 @@ export default function DonationFilters() {
   }
 
   const removeFilter = (filter: string) => {
-    setActiveFilters(activeFilters.filter(f => f !== filter))
-    
+    setActiveFilters(activeFilters.filter((f) => f !== filter))
+
     // Reset the corresponding filter
     if (filter.includes("Within")) {
       setDistance([10])
@@ -111,7 +100,7 @@ export default function DonationFilters() {
             />
           </svg>
         </div>
-        
+
         <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="flex items-center gap-2">
@@ -125,31 +114,23 @@ export default function DonationFilters() {
           <SheetContent className="w-full sm:max-w-md">
             <SheetHeader>
               <SheetTitle>Filter Donations</SheetTitle>
-              <SheetDescription>
-                Narrow down available donations based on your preferences
-              </SheetDescription>
+              <SheetDescription>Narrow down available donations based on your preferences</SheetDescription>
             </SheetHeader>
-            
+
             <div className="py-6 space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-base">Distance</Label>
                   <span className="text-sm text-gray-500">Within {distance[0]} km</span>
                 </div>
-                <Slider
-                  value={distance}
-                  onValueChange={setDistance}
-                  max={20}
-                  step={1}
-                  className="w-full"
-                />
+                <Slider value={distance} onValueChange={setDistance} max={20} step={1} className="w-full" />
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>1 km</span>
                   <span>10 km</span>
                   <span>20 km</span>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base">Food Type</Label>
                 <Select value={foodType} onValueChange={setFoodType}>
@@ -166,7 +147,7 @@ export default function DonationFilters() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="space-y-2">
                 <Label className="text-base">Expiry Time</Label>
                 <Select value={expiryTime} onValueChange={setExpiryTime}>
@@ -179,11 +160,11 @@ export default function DonationFilters() {
                     <SelectItem value="Expires today">Expires today</SelectItem>
                     <SelectItem value="Expires in 3 days">Expires within 3 days</SelectItem>
                     {/* Fixed the ">" character by using JSX escape syntax */}
-                    <SelectItem value="Long shelf life">Long shelf life ({'>'}3 days)</SelectItem>
+                    <SelectItem value="Long shelf life">Long shelf life ({">"}3 days)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="additional-filters">
                   <AccordionTrigger>Additional Filters</AccordionTrigger>
@@ -204,7 +185,7 @@ export default function DonationFilters() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Dietary Preferences</Label>
                         <Select defaultValue="all">
@@ -220,7 +201,7 @@ export default function DonationFilters() {
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <Label>Minimum Quantity</Label>
                         <Select defaultValue="all">
@@ -241,20 +222,13 @@ export default function DonationFilters() {
                 </AccordionItem>
               </Accordion>
             </div>
-            
+
             <SheetFooter className="flex-col sm:flex-row gap-3 sm:justify-between">
-              <Button 
-                variant="outline" 
-                onClick={handleClearFilters}
-                className="w-full sm:w-auto"
-              >
+              <Button variant="outline" onClick={handleClearFilters} className="w-full sm:w-auto">
                 Clear All
               </Button>
               <SheetClose asChild>
-                <Button 
-                  onClick={handleApplyFilters}
-                  className="w-full sm:w-auto bg-green-500 hover:bg-green-600"
-                >
+                <Button onClick={handleApplyFilters} className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
                   Apply Filters
                 </Button>
               </SheetClose>
@@ -262,12 +236,12 @@ export default function DonationFilters() {
           </SheetContent>
         </Sheet>
       </div>
-      
+
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap gap-2 mt-4">
           {activeFilters.map((filter) => (
-            <Badge 
-              key={filter} 
+            <Badge
+              key={filter}
               variant="secondary"
               className="flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800"
             >
@@ -287,7 +261,7 @@ export default function DonationFilters() {
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <span>{filter.replace(/"/g, '')}</span>
+                  <span>{filter.replace(/"/g, "")}</span>
                 </>
               ) : filter.includes("Within") ? (
                 <>
@@ -305,19 +279,16 @@ export default function DonationFilters() {
                   <span>{filter}</span>
                 </>
               )}
-              <button 
-                onClick={() => removeFilter(filter)}
-                className="ml-1 text-gray-500 hover:text-gray-700"
-              >
+              <button onClick={() => removeFilter(filter)} className="ml-1 text-gray-500 hover:text-gray-700">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
           ))}
-          
+
           {activeFilters.length > 0 && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleClearFilters}
               className="text-xs h-7 px-2 text-gray-500 hover:text-gray-700"
             >
@@ -329,4 +300,3 @@ export default function DonationFilters() {
     </div>
   )
 }
-

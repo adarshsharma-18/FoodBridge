@@ -1,24 +1,52 @@
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { logout } from "@/app/actions/auth"
 import { DonorDashboard } from "@/components/dashboard/donor-dashboard"
 import { NgoDashboard } from "@/components/dashboard/ngo-dashboard"
 import { DriverDashboard } from "@/components/dashboard/driver-dashboard"
 import { BiogasDashboard } from "@/components/dashboard/biogas-dashboard"
+import { useAuth } from "@/contexts/auth-context"
+import { Loader2 } from "lucide-react"
 
 export default function DashboardPage() {
-  const token = cookies().get("auth-token")
-  const role = cookies().get("user-role")
-  const email = cookies().get("user-email")
+  const router = useRouter()
+  const { user, isLoading, logout } = useAuth()
+  const [pageLoading, setPageLoading] = useState(true)
 
-  if (!token) {
-    redirect("/login")
+  useEffect(() => {
+    // Only check after auth has finished loading
+    if (!isLoading) {
+      if (!user) {
+        // If not logged in, redirect to login page
+        router.push("/login")
+      } else {
+        // If logged in, show the dashboard
+        setPageLoading(false)
+      }
+    }
+  }, [user, router, isLoading])
+
+  // Show loading state while checking authentication
+  if (isLoading || pageLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600 mx-auto" />
+          <p className="mt-2 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
   }
 
-  const userRole = role?.value || "donor"
-  const userEmail = email?.value || ""
-  const userName = userEmail.split("@")[0].charAt(0).toUpperCase() + userEmail.split("@")[0].slice(1)
+  // Safety check - should never happen due to the redirect above
+  if (!user) {
+    return null
+  }
+
+  const userRole = user.role
+  const userName = user.name
 
   // Determine which dashboard component to render based on user role
   const DashboardComponent = () => {
@@ -46,11 +74,9 @@ export default function DashboardPage() {
               Manage your {userRole === "donor" ? "donations" : "collections"} and track your impact
             </p>
           </div>
-          <form action={logout}>
-            <Button variant="outline" type="submit">
-              Logout
-            </Button>
-          </form>
+          <Button variant="outline" onClick={logout}>
+            Logout
+          </Button>
         </div>
 
         {/* Render the appropriate dashboard based on user role */}
@@ -59,4 +85,3 @@ export default function DashboardPage() {
     </div>
   )
 }
-

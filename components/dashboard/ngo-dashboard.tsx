@@ -5,46 +5,101 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, TrendingUp, MapPin, Calendar, BarChart3, Users } from "lucide-react"
+import { ArrowRight, TrendingUp, MapPin, Calendar, BarChart3, Users, Truck, Phone } from "lucide-react"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { getCollectionsByNgo, getDonationById } from "@/lib/storage"
+import { OpenMapsButton } from "@/components/open-maps-button"
 
 interface NgoDashboardProps {
   userName: string
 }
 
 export function NgoDashboard({ userName }: NgoDashboardProps) {
-  // Mock data for collections
-  const recentCollections = [
-    {
-      id: "col123",
-      foodName: "Cooked Rice and Curry",
-      quantity: "5 kg",
-      date: "2 days ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      donorName: "Restaurant A",
-      address: "123 Main St, City",
-    },
-    {
-      id: "col456",
-      foodName: "Fresh Vegetables",
-      quantity: "3 kg",
-      date: "1 week ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      donorName: "Grocery Store B",
-      address: "456 Oak St, City",
-    },
-    {
-      id: "col789",
-      foodName: "Bread and Pastries",
-      quantity: "10 items",
-      date: "2 weeks ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      donorName: "Bakery C",
-      address: "789 Pine St, City",
-    },
-  ]
+  const { user } = useAuth()
+  const [recentCollections, setRecentCollections] = useState<any[]>([])
+  const [allCollections, setAllCollections] = useState<any[]>([])
+
+  useEffect(() => {
+    if (user) {
+      loadCollections()
+    }
+  }, [user])
+
+  const loadCollections = () => {
+    if (!user) return
+
+    const collections = getCollectionsByNgo(user.id)
+
+    // Enhance collections with donation details
+    const enhancedCollections = collections.map((collection) => {
+      const donation = getDonationById(collection.donationId)
+      return {
+        ...collection,
+        foodName: donation?.foodName || "Food Item",
+        quantity: donation?.quantity || "Unknown quantity",
+        date: formatRelativeTime(new Date(collection.createdAt)),
+        statusColor: getStatusColor(collection.status),
+        address: donation?.address || "Unknown location",
+        latitude: donation?.latitude,
+        longitude: donation?.longitude,
+      }
+    })
+
+    // Sort by creation date (newest first)
+    const sortedCollections = [...enhancedCollections].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+
+    setAllCollections(sortedCollections)
+    setRecentCollections(sortedCollections.slice(0, 3))
+  }
+
+  const formatRelativeTime = (date: Date) => {
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diffInSeconds < 60) return "Just now"
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`
+
+    return date.toLocaleDateString()
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "requested":
+        return "text-amber-600"
+      case "assigned":
+        return "text-blue-600"
+      case "in-transit":
+        return "text-purple-600"
+      case "completed":
+        return "text-green-600"
+      case "cancelled":
+        return "text-red-600"
+      default:
+        return "text-gray-600"
+    }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "requested":
+        return "Requested"
+      case "assigned":
+        return "Driver Assigned"
+      case "in-transit":
+        return "In Transit"
+      case "completed":
+        return "Collected"
+      case "cancelled":
+        return "Cancelled"
+      default:
+        return status
+    }
+  }
 
   // Mock data for available donations
   const availableDonations = [
@@ -112,7 +167,7 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
                       <p className="text-sm text-gray-500">CO₂ Saved</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">15</p>
+                      <p className="text-2xl font-bold text-blue-600">{allCollections.length}</p>
                       <p className="text-sm text-gray-500">Collections</p>
                     </div>
                   </div>
@@ -223,7 +278,11 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
                 </div>
               </CardContent>
               <CardFooter>
-                <p className="text-xs text-gray-500 w-full text-center">Your last collection was 2 days ago</p>
+                <p className="text-xs text-gray-500 w-full text-center">
+                  {recentCollections.length > 0
+                    ? `Your last collection was ${recentCollections[0].date}`
+                    : "No recent collections"}
+                </p>
               </CardFooter>
             </Card>
           </motion.div>
@@ -232,58 +291,84 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4">Recent Collections</h2>
           <div className="space-y-4">
-            {recentCollections.map((collection, index) => (
-              <motion.div
-                key={collection.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{collection.foodName}</CardTitle>
-                        <CardDescription>From {collection.donorName}</CardDescription>
+            {recentCollections.length > 0 ? (
+              recentCollections.map((collection, index) => (
+                <motion.div
+                  key={collection.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 * index }}
+                >
+                  <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{collection.foodName}</CardTitle>
+                          <CardDescription>Collection #{collection.id.slice(-5)}</CardDescription>
+                        </div>
+                        <Badge className={`${collection.statusColor} bg-green-50`}>
+                          {getStatusLabel(collection.status)}
+                        </Badge>
                       </div>
-                      <Badge className={`${collection.statusColor} bg-green-50`}>{collection.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{collection.quantity}</p>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Quantity</p>
+                          <p>{collection.quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Date</p>
+                          <p>{collection.date}</p>
+                        </div>
+                        {collection.driverName ? (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Driver</p>
+                            <p>{collection.driverName}</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Pickup Address</p>
+                            <p>{collection.address}</p>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Date</p>
-                        <p>{collection.date}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Pickup Address</p>
-                        <p>{collection.address}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/track/${collection.id}`}>Track Collection</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/collections/${collection.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                    <CardFooter>
+                      <OpenMapsButton
+                        address={collection.address}
+                        latitude={collection.latitude}
+                        longitude={collection.longitude}
+                        variant="outline"
+                        size="sm"
+                      />
+                      <Button variant="ghost" size="sm" asChild className="ml-auto">
+                        <Link href={`/track/${collection.id}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="pt-6 text-center py-8">
+                  <p className="text-muted-foreground">No collections found.</p>
+                  <Button asChild className="mt-4 bg-green-600 hover:bg-green-700">
+                    <Link href="/collect">Collect Food Now</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
-          <div className="mt-4 text-center">
-            <Button asChild variant="outline">
-              <Link href="/dashboard?tab=collections">
-                View All Collections <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+          {recentCollections.length > 0 && (
+            <div className="mt-4 text-center">
+              <Button asChild variant="outline">
+                <Link href="/dashboard?tab=collections">
+                  View All Collections <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="mb-8">
@@ -362,54 +447,86 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
           </div>
 
           <div className="space-y-6">
-            {[...recentCollections, ...recentCollections].map((collection, index) => (
-              <motion.div
-                key={`${collection.id}-${index}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.05 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{collection.foodName}</CardTitle>
-                        <CardDescription>Collection #{collection.id.slice(-3)}</CardDescription>
+            {allCollections.length > 0 ? (
+              allCollections.map((collection, index) => (
+                <motion.div
+                  key={`${collection.id}-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.05 * index }}
+                >
+                  <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{collection.foodName}</CardTitle>
+                          <CardDescription>Collection #{collection.id.slice(-5)}</CardDescription>
+                        </div>
+                        <Badge className={`${collection.statusColor} bg-green-50`}>
+                          {getStatusLabel(collection.status)}
+                        </Badge>
                       </div>
-                      <Badge className={`${collection.statusColor} bg-green-50`}>{collection.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{collection.quantity}</p>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Quantity</p>
+                          <p>{collection.quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Date</p>
+                          <p>{collection.date}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Pickup Address</p>
+                          <p>{collection.address}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Driver</p>
+                          <p>{collection.driverName || "Not assigned"}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Date</p>
-                        <p>{collection.date}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Donor</p>
-                        <p>{collection.donorName}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Pickup Address</p>
-                        <p>{collection.address}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/track/${collection.id}`}>Track Collection</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/collections/${collection.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                    <CardFooter>
+                      {!collection.driverName && collection.status === "requested" && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/assign-driver/${collection.id}`}>
+                            <Truck className="mr-2 h-4 w-4" />
+                            Assign Driver
+                          </Link>
+                        </Button>
+                      )}
+                      {collection.driverName && (
+                        <Button variant="outline" size="sm">
+                          <Phone className="mr-2 h-4 w-4" />
+                          Contact Driver
+                        </Button>
+                      )}
+                      <OpenMapsButton
+                        address={collection.address}
+                        latitude={collection.latitude}
+                        longitude={collection.longitude}
+                        variant="outline"
+                        size="sm"
+                        className="ml-2"
+                      />
+                      <Button variant="ghost" size="sm" asChild className="ml-auto">
+                        <Link href={`/track/${collection.id}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="pt-6 text-center py-8">
+                  <p className="text-muted-foreground">No collections found.</p>
+                  <Button asChild className="mt-4 bg-green-600 hover:bg-green-700">
+                    <Link href="/collect">Collect Food Now</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </TabsContent>
@@ -528,4 +645,3 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
     </Tabs>
   )
 }
-

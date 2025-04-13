@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { motion } from "framer-motion"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { getAvailableDonations, addCollection, updateDonation, type Donation, type Collection } from "@/lib/storage"
+import { useAuth } from "@/contexts/auth-context"
+import { OpenMapsButton } from "@/components/open-maps-button"
 import {
   Dialog,
   DialogContent,
@@ -12,335 +14,178 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Clock, MapPin, AlertCircle, Store, Utensils, CroissantIcon as Bread, Carrot, Package } from "lucide-react"
-import { useActionState } from "react"
-import { submitCollection, type CollectionFormState } from "@/app/actions/collection"
+import { Input } from "@/components/ui/input"
+import { toast } from "@/components/ui/use-toast"
 
-interface Donation {
-  id: string
-  foodName: string
-  foodType: string
-  quantity: string
-  condition: string
-  address: string
-  donorName: string
-  createdAt: string
-  distance: string
-  latitude: string
-  longitude: string
-  expiryTime?: string
-  preparedAt?: string
-  storage?: string
-  additionalInfo?: string
-  servings?: string
-  source?: string
-  isRequested?: boolean
-}
-
-interface AvailableDonationsProps {
-  donations: Donation[]
-}
-
-const initialState: CollectionFormState = {}
-
-export function AvailableDonations({ donations }: AvailableDonationsProps) {
+export function AvailableDonations() {
+  const { user } = useAuth()
+  const [donations, setDonations] = useState<Donation[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedDonation, setSelectedDonation] = useState<Donation | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [state, formAction] = useActionState(submitCollection, initialState)
-  const [claimedDonations, setClaimedDonations] = useState<string[]>([])
-  const [filteredDonations, setFilteredDonations] = useState<Donation[]>([])
-  const [activeFilters, setActiveFilters] = useState({
-    distance: "all",
-    foodType: "all",
-    expiryTime: "all",
-  })
-  const router = useRouter()
+  const [pickupTime, setPickupTime] = useState("")
+  const [notes, setNotes] = useState("")
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  // Initialize with enhanced mock data that matches the image
   useEffect(() => {
-    const enhancedDonations = [
-      {
-        id: "don123",
-        foodName: "Fresh Cooked Meals",
-        foodType: "cooked",
-        quantity: "10 kg (approx. 20 servings)",
-        condition: "fresh",
-        address: "123 Main St, City",
-        donorName: "Green Bistro Restaurant",
-        createdAt: new Date().toISOString(),
-        distance: "2.3 km",
-        latitude: "40.7128",
-        longitude: "-74.0060",
-        expiryTime: "8 hours",
-        preparedAt: "Today at 12:30 PM",
-        storage: "Hot/Warm",
-        additionalInfo: "Vegetarian Meals",
-        isRequested: true,
-      },
-      {
-        id: "don456",
-        foodName: "Bakery Items",
-        foodType: "bakery",
-        quantity: "5 kg (various items)",
-        condition: "good",
-        address: "456 Oak St, City",
-        donorName: "Daily Bread Bakery",
-        createdAt: new Date(Date.now() - 3600000).toISOString(),
-        distance: "4.7 km",
-        latitude: "40.7138",
-        longitude: "-74.0070",
-        expiryTime: "24 hours",
-        preparedAt: "Today at 6:00 AM",
-        storage: "Room Temperature",
-        additionalInfo: "Bread, Pastries",
-      },
-      {
-        id: "don789",
-        foodName: "Fresh Produce",
-        foodType: "raw",
-        quantity: "8 kg",
-        condition: "fresh",
-        address: "789 Pine St, City",
-        donorName: "FreshMart Supermarket",
-        createdAt: new Date(Date.now() - 7200000).toISOString(),
-        distance: "1.8 km",
-        latitude: "40.7148",
-        longitude: "-74.0080",
-        expiryTime: "5 hours",
-        storage: "Refrigerated",
-        additionalInfo: "Vegetables, Fruits",
-        source: "Local Farms",
-      },
-      {
-        id: "don101",
-        foodName: "Canned Goods",
-        foodType: "packaged",
-        quantity: "15 kg (30 cans)",
-        condition: "staple",
-        address: "101 Market St, City",
-        donorName: "Community Pantry",
-        createdAt: new Date(Date.now() - 10800000).toISOString(),
-        distance: "3.5 km",
-        latitude: "40.7158",
-        longitude: "-74.0090",
-        expiryTime: "6 months",
-        storage: "Room Temperature",
-        additionalInfo: "Beans, Soups, Vegetables",
-      },
-      {
-        id: "don202",
-        foodName: "Dairy Products",
-        foodType: "dairy",
-        quantity: "4 kg",
-        condition: "good",
-        address: "202 Dairy Lane, City",
-        donorName: "Farm Fresh Market",
-        createdAt: new Date(Date.now() - 14400000).toISOString(),
-        distance: "5.2 km",
-        latitude: "40.7168",
-        longitude: "-74.0100",
-        expiryTime: "3 days",
-        preparedAt: "Today at 8:00 AM",
-        storage: "Refrigerated",
-        additionalInfo: "Milk, Cheese, Yogurt",
-      },
-      {
-        id: "don303",
-        foodName: "Prepared Sandwiches",
-        foodType: "cooked",
-        quantity: "20 items",
-        condition: "fresh",
-        address: "303 Cafe St, City",
-        donorName: "Urban Cafe",
-        createdAt: new Date(Date.now() - 18000000).toISOString(),
-        distance: "0.8 km",
-        latitude: "40.7178",
-        longitude: "-74.0110",
-        expiryTime: "10 hours",
-        preparedAt: "Today at 10:00 AM",
-        storage: "Room Temperature",
-        additionalInfo: "Various fillings, includes vegetarian options",
-      },
-    ]
-
-    setFilteredDonations(enhancedDonations)
+    // Fetch available donations
+    const availableDonations = getAvailableDonations()
+    setDonations(availableDonations)
+    setLoading(false)
   }, [])
 
-  const handleSubmit = (formData: FormData) => {
-    setIsSubmitting(true)
-    formAction(formData)
-
-    // Simulate successful claim
-    setTimeout(() => {
-      const donationId = formData.get("donationId") as string
-      if (donationId) {
-        setClaimedDonations((prev) => [...prev, donationId])
-      }
-      setIsSubmitting(false)
-    }, 1500)
+  const handleCollectClick = (donation: Donation) => {
+    setSelectedDonation(donation)
+    // Set default pickup time to 2 hours from now
+    const defaultPickupTime = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    setPickupTime(defaultPickupTime.toISOString().slice(0, 16)) // Format for datetime-local input
+    setNotes("")
+    setDialogOpen(true)
   }
 
-  const getFoodIcon = (foodType: string) => {
-    switch (foodType.toLowerCase()) {
-      case "cooked":
-        return <Utensils className="h-10 w-10 text-green-500" />
-      case "bakery":
-        return <Bread className="h-10 w-10 text-green-500" />
-      case "raw":
-        return <Carrot className="h-10 w-10 text-green-500" />
-      case "packaged":
-        return <Package className="h-10 w-10 text-green-500" />
-      case "dairy":
-        return <Package className="h-10 w-10 text-green-500" />
-      default:
-        return <Package className="h-10 w-10 text-green-500" />
+  const handleCollect = () => {
+    if (!user || !selectedDonation) return
+
+    // Create a new collection request
+    const newCollection: Collection = {
+      id: `col_${Date.now()}`,
+      donationId: selectedDonation.id,
+      ngoId: user.id,
+      ngoName: user.name,
+      pickupTime: pickupTime || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      notes: notes || "No additional notes",
+      status: "requested", // Initial status is "requested" - waiting for a driver to accept
+      createdAt: new Date().toISOString(),
     }
+
+    // Add to collections
+    addCollection(newCollection)
+
+    // Update the donation status
+    updateDonation({
+      ...selectedDonation,
+      status: "assigned",
+      assignedTo: user.id,
+    })
+
+    // Remove from available donations
+    setDonations((prev) => prev.filter((d) => d.id !== selectedDonation.id))
+
+    // Close dialog and reset form
+    setDialogOpen(false)
+    setSelectedDonation(null)
+    setPickupTime("")
+    setNotes("")
+
+    // Show success message
+    toast({
+      title: "Donation claimed successfully",
+      description: "A driver will be assigned to pick up this donation soon.",
+    })
   }
 
-  const isDonationClaimed = (donationId: string) => {
-    return claimedDonations.includes(donationId) || filteredDonations.find((d) => d.id === donationId)?.isRequested
+  if (loading) {
+    return <div className="text-center py-8">Loading available donations...</div>
+  }
+
+  if (donations.length === 0) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-muted-foreground">No available donations found.</p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-        {filteredDonations.map((donation, index) => (
-          <motion.div
-            key={donation.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-          >
-            <Card className="h-full border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-              <div className="flex justify-between items-start p-4 bg-gray-50 border-b border-gray-100">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Clock className="h-4 w-4 mr-1 text-green-500" />
-                  <span>Expires in {donation.expiryTime}</span>
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-1 text-green-500" />
-                  <span>{donation.distance} away</span>
-                </div>
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {donations.map((donation) => (
+          <Card key={donation.id} className="flex flex-col">
+            <CardHeader className="pb-2">
+              <div className="flex justify-between">
+                <CardTitle>{donation.foodName}</CardTitle>
+                <Badge>{donation.foodType}</Badge>
               </div>
-
-              <CardContent className="p-6">
-                <div className="flex flex-col items-center mb-6">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    {getFoodIcon(donation.foodType)}
-                  </div>
-                  <h3 className="text-xl font-bold text-center text-gray-900">{donation.foodName}</h3>
+              <CardDescription>{donation.donorName}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              <div className="grid gap-2">
+                <div>
+                  <p className="text-sm font-medium">Quantity</p>
+                  <p className="text-sm text-muted-foreground">{donation.quantity}</p>
                 </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-medium text-gray-700">Quantity:</span> {donation.quantity}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Type:</span> {donation.additionalInfo}
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Storage:</span> {donation.storage}
-                  </div>
-                  {donation.preparedAt && (
-                    <div>
-                      <span className="font-medium text-gray-700">Prepared:</span> {donation.preparedAt}
-                    </div>
-                  )}
-                  {donation.source && (
-                    <div>
-                      <span className="font-medium text-gray-700">Sources:</span> {donation.source}
-                    </div>
-                  )}
+                <div>
+                  <p className="text-sm font-medium">Condition</p>
+                  <p className="text-sm text-muted-foreground">{donation.condition}</p>
                 </div>
-              </CardContent>
-
-              <CardFooter className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-                <div className="flex items-center">
-                  <Store className="h-5 w-5 text-gray-500 mr-2" />
-                  <span className="text-sm font-medium text-gray-700">{donation.donorName}</span>
+                <div>
+                  <p className="text-sm font-medium">Location</p>
+                  <p className="text-sm text-muted-foreground">{donation.address}</p>
                 </div>
-
-                {isDonationClaimed(donation.id) ? (
-                  <Button className="bg-gray-200 text-gray-700 hover:bg-gray-200 cursor-default" disabled>
-                    Requested
-                  </Button>
-                ) : (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        className="bg-green-500 hover:bg-green-600 text-white"
-                        onClick={() => setSelectedDonation(donation)}
-                      >
-                        Request
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Request Food Donation</DialogTitle>
-                        <DialogDescription>
-                          You are about to request this food donation. Please provide pickup details.
-                        </DialogDescription>
-                      </DialogHeader>
-
-                      {selectedDonation && (
-                        <form action={handleSubmit} className="space-y-4">
-                          <input type="hidden" name="donationId" value={selectedDonation.id} />
-
-                          <div className="space-y-2">
-                            <Label htmlFor="pickupTime">Estimated Pickup Time</Label>
-                            <Input id="pickupTime" name="pickupTime" type="datetime-local" required />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="notes">Additional Notes (Optional)</Label>
-                            <Textarea
-                              id="notes"
-                              name="notes"
-                              placeholder="Any special instructions for pickup"
-                              className="resize-none"
-                            />
-                          </div>
-
-                          <div className="bg-amber-50 p-3 rounded-md flex items-start">
-                            <AlertCircle className="h-5 w-5 text-amber-500 mr-2 mt-0.5 shrink-0" />
-                            <p className="text-sm text-amber-800">
-                              Once requested, you are responsible for picking up this donation. Please only request if
-                              you can collect it.
-                            </p>
-                          </div>
-
-                          <DialogFooter>
-                            <Button type="submit" className="bg-green-500 hover:bg-green-600" disabled={isSubmitting}>
-                              {isSubmitting ? "Processing..." : "Confirm Request"}
-                            </Button>
-                          </DialogFooter>
-                        </form>
-                      )}
-                    </DialogContent>
-                  </Dialog>
+                {donation.expiryDate && (
+                  <div>
+                    <p className="text-sm font-medium">Expiry</p>
+                    <p className="text-sm text-muted-foreground">{new Date(donation.expiryDate).toLocaleString()}</p>
+                  </div>
                 )}
-              </CardFooter>
-            </Card>
-          </motion.div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between pt-2">
+              <OpenMapsButton address={donation.address} latitude={donation.latitude} longitude={donation.longitude} />
+
+              {user && (user.role === "ngo" || user.role === "admin") && (
+                <Button onClick={() => handleCollectClick(donation)}>Claim Donation</Button>
+              )}
+            </CardFooter>
+          </Card>
         ))}
       </div>
 
-      {filteredDonations.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg mt-8">
-          <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-medium mb-2">No donations available</h3>
-          <p className="text-gray-500">
-            There are currently no food donations available that match your filters. Please adjust your filters or check
-            back later.
-          </p>
-        </div>
-      )}
-    </div>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Claim Donation</DialogTitle>
+            <DialogDescription>
+              Provide pickup details for this donation. A driver will be assigned to collect it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="pickup-time" className="col-span-4">
+                Preferred Pickup Time
+              </Label>
+              <Input
+                id="pickup-time"
+                type="datetime-local"
+                value={pickupTime}
+                onChange={(e) => setPickupTime(e.target.value)}
+                className="col-span-4"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="notes" className="col-span-4">
+                Additional Notes (Optional)
+              </Label>
+              <Input
+                id="notes"
+                placeholder="Any special instructions for pickup"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="col-span-4"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCollect}>Claim Donation</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
-

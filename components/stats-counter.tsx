@@ -48,4 +48,3 @@ export function StatsCounter({ value, label, icon }: StatsCounterProps) {
     </motion.div>
   )
 }
-

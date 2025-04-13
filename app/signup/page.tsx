@@ -1,39 +1,59 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useActionState } from "react"
-import { signup, type SignupFormState } from "@/app/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-const initialState: SignupFormState = {}
+import { useAuth } from "@/contexts/auth-context"
 
 export default function SignupPage() {
   const router = useRouter()
-  const [state, formAction] = useActionState(signup, initialState)
+  const { signup, user } = useAuth()
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [role, setRole] = useState("donor")
+  const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const handleSubmit = (formData: FormData) => {
-    setIsSubmitting(true)
-    formAction(formData)
-  }
+  const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    if (state.success) {
-      // Redirect to dashboard after successful signup
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 1500)
-    } else if (state.errors) {
+    // If user is already logged in, redirect to dashboard
+    if (user) {
+      router.push("/dashboard")
+    }
+  }, [user, router])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const result = await signup(name, email, password, role)
+
+      if (result.success) {
+        setSuccess(true)
+        // Redirect to dashboard after successful signup
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 1500)
+      } else {
+        setError(result.message)
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
       setIsSubmitting(false)
     }
-  }, [state, router])
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -43,70 +63,52 @@ export default function SignupPage() {
           <CardDescription>Enter your information to create a FoodBridge account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={handleSubmit} className="space-y-4">
-            {state.errors?._form && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
               <Alert variant="destructive">
-                <AlertDescription>
-                  {state.errors._form.map((error) => (
-                    <p key={error}>{error}</p>
-                  ))}
-                </AlertDescription>
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
-            {state.success && (
+            {success && (
               <Alert className="bg-green-50 text-green-800 border-green-200">
-                <AlertDescription>{state.message}</AlertDescription>
+                <AlertDescription>Account created successfully! Redirecting...</AlertDescription>
               </Alert>
             )}
 
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" name="name" placeholder="John Doe" required aria-describedby="name-error" />
-              {state.errors?.name && (
-                <p id="name-error" className="text-sm text-red-500">
-                  {state.errors.name.map((error) => (
-                    <span key={error}>{error}</span>
-                  ))}
-                </p>
-              )}
+              <Input id="name" placeholder="John Doe" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
-                name="email"
                 type="email"
                 placeholder="name@example.com"
                 required
-                aria-describedby="email-error"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
-              {state.errors?.email && (
-                <p id="email-error" className="text-sm text-red-500">
-                  {state.errors.email.map((error) => (
-                    <span key={error}>{error}</span>
-                  ))}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required aria-describedby="password-error" />
-              {state.errors?.password && (
-                <p id="password-error" className="text-sm text-red-500">
-                  {state.errors.password.map((error) => (
-                    <span key={error}>{error}</span>
-                  ))}
-                </p>
-              )}
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <p className="text-xs text-gray-500">Password must be at least 6 characters</p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="role">I am a</Label>
-              <Select name="role" defaultValue="donor">
-                <SelectTrigger id="role" aria-describedby="role-error">
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger id="role">
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
@@ -116,13 +118,6 @@ export default function SignupPage() {
                   <SelectItem value="biogas">Biogas Plant</SelectItem>
                 </SelectContent>
               </Select>
-              {state.errors?.role && (
-                <p id="role-error" className="text-sm text-red-500">
-                  {state.errors.role.map((error) => (
-                    <span key={error}>{error}</span>
-                  ))}
-                </p>
-              )}
             </div>
 
             <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
@@ -142,4 +137,3 @@ export default function SignupPage() {
     </div>
   )
 }
-

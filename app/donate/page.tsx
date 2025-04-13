@@ -1,6 +1,30 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DonationForm } from "@/components/donation-form"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function DonatePage() {
+  const { user, isAuthorized } = useAuth()
+  const router = useRouter()
+
+  // Check if user is authorized to access this page
+  useEffect(() => {
+    if (!user) {
+      router.push("/login?redirect=/donate")
+      return
+    }
+
+    if (!isAuthorized(["donor", "admin"])) {
+      router.push("/dashboard")
+    }
+  }, [user, isAuthorized, router])
+
+  if (!user || !isAuthorized(["donor", "admin"])) {
+    return null // Don't render anything while redirecting
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pt-24 pb-12">
       <div className="container px-4 md:px-6 mx-auto">
@@ -17,4 +41,3 @@ export default function DonatePage() {
     </div>
   )
 }
-
