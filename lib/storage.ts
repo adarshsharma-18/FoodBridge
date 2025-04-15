@@ -1,4 +1,4 @@
-"use client"
+"\"use client"
 
 // Type definitions
 export interface User {
@@ -291,4 +291,8 @@ export function initializeStorage(): void {
 export function getDonationById(id: string): Donation | undefined {
   const donations = getDonations()
   return donations.find((donation) => donation.id === id)
+}
+
+export function getRegisteredUsers(): User[] {
+  return getItem<User[]>("registered-users", [])
 }

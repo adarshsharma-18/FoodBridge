@@ -202,7 +202,7 @@ export function BiogasDashboard({ userName }: BiogasDashboardProps) {
                     </Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full">
-                    <Link href="/track">
+                    <Link href="/dashboard?tab=incoming">
                       Track Incoming Waste <MapPin className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>

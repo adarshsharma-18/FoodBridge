@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Navbar } from "@/components/navbar"
-import { Chatbot } from "@/components/chatbot"
+import { ConditionalChatbot } from "@/components/conditional-chatbot"
 import { AuthProvider } from "@/contexts/auth-context"
 import { Toaster } from "@/components/ui/use-toast"
 
@@ -27,7 +27,7 @@ export default function RootLayout({
         <AuthProvider>
           <Navbar />
           {children}
-          <Chatbot />
+          <ConditionalChatbot />
           <Toaster />
         </AuthProvider>
       </body>

@@ -92,67 +92,60 @@ export function Navbar() {
   return (
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled || isMobileMenuOpen ? "bg-white shadow-md py-2" : "bg-transparent py-4"
+        isScrolled || isMobileMenuOpen ? "bg-green-600 shadow-md py-2" : "bg-green-600 py-4"
       }`}
     >
       <div className="container px-4 md:px-6 mx-auto">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center">
-            <span className={`text-2xl font-bold ${isScrolled || isMobileMenuOpen ? "text-green-600" : "text-white"}`}>
-              FoodBridge
-            </span>
+            <span className="text-2xl font-bold text-white">FoodBridge</span>
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            <Link
-              href="/"
-              className={`font-medium hover:text-green-600 transition-colors ${
-                isScrolled || isMobileMenuOpen ? "text-gray-700" : "text-white"
-              }`}
-            >
-              Home
-            </Link>
-            <Link
-              href="/information"
-              className={`font-medium hover:text-green-600 transition-colors ${
-                isScrolled || isMobileMenuOpen ? "text-gray-700" : "text-white"
-              }`}
-            >
-              Information
-            </Link>
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className={`font-medium hover:text-green-600 transition-colors flex items-center ${
-                  isScrolled || isMobileMenuOpen ? "text-gray-700" : "text-white"
-                }`}
-              >
-                Services <ChevronDown className="ml-1 h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {/* Show donation option only for donors or users with both roles */}
-                {(!user || isAuthorized(["donor", "admin"])) && (
-                  <DropdownMenuItem>
-                    <Link href="/donate" className="w-full">
-                      Donate Food
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                {/* Show collection option only for NGOs or users with both roles */}
-                {(!user || isAuthorized(["ngo", "admin"])) && (
-                  <DropdownMenuItem>
-                    <Link href="/collect" className="w-full">
-                      Collect Food
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem>
-                  <Link href="/track" className="w-full">
-                    Track Donations
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {(!user || user.role !== "admin") && (
+              <>
+                <Link href="/" className="font-medium text-white hover:text-gray-200 transition-colors">
+                  Home
+                </Link>
+                <Link href="/information" className="font-medium text-white hover:text-gray-200 transition-colors">
+                  Information
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger className="font-medium text-white hover:text-gray-200 transition-colors flex items-center">
+                    Services <ChevronDown className="ml-1 h-4 w-4" />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {/* Show donation option only for donors or admin */}
+                    {(!user || user.role === "donor") && (
+                      <DropdownMenuItem>
+                        <Link href="/donate" className="w-full">
+                          Donate Food
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {/* Show collection option only for NGOs */}
+                    {(!user || user.role === "ngo") && (
+                      <DropdownMenuItem>
+                        <Link href="/collect" className="w-full">
+                          Collect Food
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem>
+                      <Link href="/track" className="w-full">
+                        Track Donations
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            )}
+            {user && user.role === "admin" && (
+              <Link href="/admin" className="font-medium text-white hover:text-gray-200 transition-colors">
+                Admin Dashboard
+              </Link>
+            )}
           </nav>
 
           <div className="hidden md:flex items-center space-x-4">
@@ -267,139 +260,80 @@ export function Navbar() {
             className="md:hidden bg-white"
           >
             <div className="container px-4 py-4 flex flex-col space-y-4">
-              <Link
-                href="/"
-                className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Home
-              </Link>
-              <Link
-                href="/information"
-                className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Information
-              </Link>
-              <details className="group">
-                <summary className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2 list-none flex justify-between items-center cursor-pointer">
-                  Services
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-4 w-4 transition-transform group-open:rotate-180"
-                  >
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </summary>
-                <div className="pl-4 mt-2 space-y-2">
-                  {/* Show donation option only for donors or users with both roles */}
-                  {(!user || isAuthorized(["donor", "admin"])) && (
-                    <Link
-                      href="/donate"
-                      className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Donate Food
-                    </Link>
-                  )}
-                  {/* Show collection option only for NGOs or users with both roles */}
-                  {(!user || isAuthorized(["ngo", "admin"])) && (
-                    <Link
-                      href="/collect"
-                      className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      Collect Food
-                    </Link>
-                  )}
+              {(!user || user.role !== "admin") && (
+                <>
                   <Link
-                    href="/track"
-                    className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                    href="/"
+                    className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    Track Donations
+                    Home
                   </Link>
-                </div>
-              </details>
-
-              {user && (
-                <div className="py-2 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-gray-700">Notifications</h3>
-                    <Badge className="bg-red-500">{notificationCount}</Badge>
-                  </div>
-                  <div className="mt-2 space-y-2 max-h-[200px] overflow-y-auto">
-                    {notifications.map((notification) => (
-                      <div key={notification.id} className="p-2 bg-gray-50 rounded-md text-sm">
-                        <p>{notification.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {user ? (
-                <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
-                  <div className="flex items-center gap-2 py-2">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-green-100 text-green-800">
-                        {user.name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium">{user.name}</p>
-                      <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+                  <Link
+                    href="/information"
+                    className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Information
+                  </Link>
+                  <details className="group">
+                    <summary className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2 list-none flex justify-between items-center cursor-pointer">
+                      Services
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4 transition-transform group-open:rotate-180"
+                      >
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </summary>
+                    <div className="pl-4 mt-2 space-y-2">
+                      {/* Show donation option only for donors */}
+                      {(!user || user.role === "donor") && (
+                        <Link
+                          href="/donate"
+                          className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Donate Food
+                        </Link>
+                      )}
+                      {/* Show collection option only for NGOs */}
+                      {(!user || user.role === "ngo") && (
+                        <Link
+                          href="/collect"
+                          className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          Collect Food
+                        </Link>
+                      )}
+                      <Link
+                        href="/track"
+                        className="block font-medium text-gray-600 hover:text-green-600 transition-colors py-2"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Track Donations
+                      </Link>
                     </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => {
-                      router.push("/dashboard")
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    <User className="mr-2 h-4 w-4" /> Dashboard
-                  </Button>
-                  <Button
-                    onClick={handleLogout}
-                    variant="outline"
-                    className="w-full justify-start border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" /> Logout
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col space-y-2 pt-2">
-                  <Button
-                    variant="outline"
-                    className="border-green-600 text-green-600 w-full"
-                    onClick={() => {
-                      router.push("/login")
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    Log In
-                  </Button>
-                  <Button
-                    className="bg-green-600 text-white w-full"
-                    onClick={() => {
-                      router.push("/signup")
-                      setIsMobileMenuOpen(false)
-                    }}
-                  >
-                    Sign Up
-                  </Button>
-                </div>
+                  </details>
+                </>
+              )}
+              {user && user.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="font-medium text-gray-700 hover:text-green-600 transition-colors py-2"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  Admin Dashboard
+                </Link>
               )}
             </div>
           </motion.div>

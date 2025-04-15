@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
+import { ShieldCheck } from "lucide-react"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -123,6 +124,11 @@ export default function SignupPage() {
             <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
               {isSubmitting ? "Creating account..." : "Sign Up"}
             </Button>
+            <div className="mt-4 text-center">
+              <Link href="/admin/login" className="text-sm font-medium text-green-600 hover:text-green-500">
+                Admin Login
+              </Link>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
@@ -132,6 +138,24 @@ export default function SignupPage() {
               Log in
             </Link>
           </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-gray-50 px-2 text-muted-foreground">Or</span>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full flex items-center justify-center"
+            onClick={() => router.push("/admin/login")}
+          >
+            <ShieldCheck className="mr-2 h-4 w-4" />
+            Admin Login
+          </Button>
         </CardFooter>
       </Card>
     </div>

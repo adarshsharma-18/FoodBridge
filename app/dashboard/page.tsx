@@ -71,7 +71,13 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tighter text-gray-900">Welcome, {userName}!</h1>
             <p className="text-gray-500">
-              Manage your {userRole === "donor" ? "donations" : "collections"} and track your impact
+              {userRole === "donor"
+                ? "Manage your donations and track your impact"
+                : userRole === "ngo"
+                  ? "Manage your collections and track your impact"
+                  : userRole === "driver"
+                    ? "Manage your pickups and deliveries"
+                    : "Manage your waste processing and energy production"}
             </p>
           </div>
           <Button variant="outline" onClick={logout}>

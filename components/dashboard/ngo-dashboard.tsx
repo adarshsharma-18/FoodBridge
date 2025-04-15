@@ -17,14 +17,52 @@ interface NgoDashboardProps {
 
 export function NgoDashboard({ userName }: NgoDashboardProps) {
   const { user } = useAuth()
-  const [recentCollections, setRecentCollections] = useState<any[]>([])
   const [allCollections, setAllCollections] = useState<any[]>([])
+  const [collectionDetails, setCollectionDetails] = useState<Record<string, any>>({})
 
   useEffect(() => {
     if (user) {
       loadCollections()
     }
   }, [user])
+
+  // Calculate impact metrics
+  const calculateImpact = () => {
+    // Extract quantities from collections
+    let totalKg = 0
+    let freshGoodKg = 0
+    let stapleKg = 0
+
+    allCollections.forEach((collection) => {
+      const details = collectionDetails[collection.id] || {}
+      if (details.quantity) {
+        // Extract numeric value from quantity string (e.g., "5 kg" -> 5)
+        const match = details.quantity.match(/(\d+)/)
+        if (match) {
+          const kg = Number.parseInt(match[0], 10)
+          totalKg += kg
+
+          if (details.condition === "fresh" || details.condition === "good") {
+            freshGoodKg += kg
+          } else if (details.condition === "staple") {
+            stapleKg += kg
+          }
+        }
+      }
+    })
+
+    // Calculate metrics
+    const peopleFed = Math.round((freshGoodKg * 1000) / 700) // 700g per person per day
+    const biogasGenerated = Math.round((stapleKg / 1000) * 0.5 * 10) / 10 // 0.5 tons of biogas per ton of staple food
+
+    return {
+      totalKg,
+      peopleFed,
+      biogasGenerated,
+    }
+  }
+
+  const { totalKg, peopleFed, biogasGenerated } = calculateImpact()
 
   const loadCollections = () => {
     if (!user) return
@@ -34,15 +72,27 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
     // Enhance collections with donation details
     const enhancedCollections = collections.map((collection) => {
       const donation = getDonationById(collection.donationId)
-      return {
-        ...collection,
+      const details = {
         foodName: donation?.foodName || "Food Item",
+        foodType: donation?.foodType || "Unknown",
+        condition: donation?.condition || "unknown",
         quantity: donation?.quantity || "Unknown quantity",
         date: formatRelativeTime(new Date(collection.createdAt)),
         statusColor: getStatusColor(collection.status),
         address: donation?.address || "Unknown location",
         latitude: donation?.latitude,
         longitude: donation?.longitude,
+      }
+
+      // Store details for impact calculation
+      setCollectionDetails((prev) => ({
+        ...prev,
+        [collection.id]: details,
+      }))
+
+      return {
+        ...collection,
+        ...details,
       }
     })
 
@@ -52,7 +102,6 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
     )
 
     setAllCollections(sortedCollections)
-    setRecentCollections(sortedCollections.slice(0, 3))
   }
 
   const formatRelativeTime = (date: Date) => {
@@ -155,16 +204,16 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">75 kg</p>
+                      <p className="text-2xl font-bold text-blue-600">{totalKg} kg</p>
                       <p className="text-sm text-gray-500">Food Collected</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">150</p>
-                      <p className="text-sm text-gray-500">Meals Served</p>
+                      <p className="text-2xl font-bold text-blue-600">{peopleFed}</p>
+                      <p className="text-sm text-gray-500">People Fed</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">45 kg</p>
-                      <p className="text-sm text-gray-500">CO₂ Saved</p>
+                      <p className="text-2xl font-bold text-blue-600">{biogasGenerated} tons</p>
+                      <p className="text-sm text-gray-500">Biogas Generated</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <p className="text-2xl font-bold text-blue-600">{allCollections.length}</p>
@@ -266,7 +315,7 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
                     </Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full">
-                    <Link href="/track">
+                    <Link href="/dashboard?tab=collections">
                       Track Collections <MapPin className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -279,156 +328,13 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
               </CardContent>
               <CardFooter>
                 <p className="text-xs text-gray-500 w-full text-center">
-                  {recentCollections.length > 0
-                    ? `Your last collection was ${recentCollections[0].date}`
+                  {allCollections.length > 0
+                    ? `Your last collection was ${allCollections[0].date}`
                     : "No recent collections"}
                 </p>
               </CardFooter>
             </Card>
           </motion.div>
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Recent Collections</h2>
-          <div className="space-y-4">
-            {recentCollections.length > 0 ? (
-              recentCollections.map((collection, index) => (
-                <motion.div
-                  key={collection.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 * index }}
-                >
-                  <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle>{collection.foodName}</CardTitle>
-                          <CardDescription>Collection #{collection.id.slice(-5)}</CardDescription>
-                        </div>
-                        <Badge className={`${collection.statusColor} bg-green-50`}>
-                          {getStatusLabel(collection.status)}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Quantity</p>
-                          <p>{collection.quantity}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Date</p>
-                          <p>{collection.date}</p>
-                        </div>
-                        {collection.driverName ? (
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Driver</p>
-                            <p>{collection.driverName}</p>
-                          </div>
-                        ) : (
-                          <div>
-                            <p className="text-sm font-medium text-gray-500">Pickup Address</p>
-                            <p>{collection.address}</p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                    <CardFooter>
-                      <OpenMapsButton
-                        address={collection.address}
-                        latitude={collection.latitude}
-                        longitude={collection.longitude}
-                        variant="outline"
-                        size="sm"
-                      />
-                      <Button variant="ghost" size="sm" asChild className="ml-auto">
-                        <Link href={`/track/${collection.id}`}>View Details</Link>
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                </motion.div>
-              ))
-            ) : (
-              <Card>
-                <CardContent className="pt-6 text-center py-8">
-                  <p className="text-muted-foreground">No collections found.</p>
-                  <Button asChild className="mt-4 bg-green-600 hover:bg-green-700">
-                    <Link href="/collect">Collect Food Now</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-          {recentCollections.length > 0 && (
-            <div className="mt-4 text-center">
-              <Button asChild variant="outline">
-                <Link href="/dashboard?tab=collections">
-                  View All Collections <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Available Donations Nearby</h2>
-          <div className="space-y-4">
-            {availableDonations.map((donation, index) => (
-              <motion.div
-                key={donation.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{donation.foodName}</CardTitle>
-                        <CardDescription>From {donation.donorName}</CardDescription>
-                      </div>
-                      <Badge className="bg-blue-100 text-blue-800">{donation.condition}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{donation.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Address</p>
-                        <p>{donation.address}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Distance</p>
-                        <p className="text-green-600">{donation.distance} away</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button
-                      className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
-                      asChild
-                    >
-                      <Link href={`/collect/${donation.id}`}>Claim Donation</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/donations/${donation.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-4 text-center">
-            <Button asChild variant="outline">
-              <Link href="/collect">
-                Browse All Available Donations <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
         </div>
       </TabsContent>
 
@@ -617,7 +523,7 @@ export function NgoDashboard({ userName }: NgoDashboardProps) {
             <div className="space-y-4 pt-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Email</p>
-                <p>contact@{userName.toLowerCase()}foodbank.org</p>
+                <p>{user?.email || `contact@${userName.toLowerCase()}foodbank.org`}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Phone</p>

@@ -10,8 +10,15 @@ import { StatsCounter } from "@/components/stats-counter"
 import { FeatureCard } from "@/components/feature-card"
 import { HowItWorks } from "@/components/how-it-works"
 import { Testimonials } from "@/components/testimonials"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function Home() {
+  const { user, isAuthorized } = useAuth()
+
+  // Determine which buttons to show based on user role
+  const showDonateButton = !user || user.role === "donor" || user.role === "admin"
+  const showCollectButton = !user || user.role === "ngo" || user.role === "admin"
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
@@ -42,28 +49,32 @@ export default function Home() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex flex-col sm:flex-row gap-4"
             >
-              <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" asChild>
-                <Link href="/donate">
-                  Donate Food <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              {showDonateButton && (
+                <Button size="lg" className="bg-green-600 hover:bg-green-700 text-white" asChild>
+                  <Link href="/donate">
+                    Donate Food <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+              {showCollectButton && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
+                  asChild
+                >
+                  <Link href="/collect">
+                    Collect Food <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
               <Button
                 size="lg"
                 variant="outline"
                 className="bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
                 asChild
               >
-                <Link href="/collect">
-                  Collect Food <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
-                asChild
-              >
-                <Link href="/track">
+                <Link href={user ? "/dashboard?tab=donations" : "/track"}>
                   Track Donations <MapPin className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

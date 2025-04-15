@@ -17,15 +17,17 @@ export interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (email: string, password: string, role: string) => Promise<{ success: boolean; message: string }>
+  login: (email: string, password: string) => Promise<{ success: boolean; message: string; redirect?: string }>
   signup: (
     name: string,
     email: string,
     password: string,
     role: string,
   ) => Promise<{ success: boolean; message: string }>
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; message: string }>
   logout: () => void
   isAuthorized: (roles: string[]) => boolean
+  getRegisteredUsers: () => User[]
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -66,6 +68,12 @@ const setCurrentUser = (user: User): void => setItem("user", user)
 const removeCurrentUser = (): void => removeItem("user")
 const setAuthToken = (token: string): void => setItem("auth-token", token)
 const removeAuthToken = (): void => removeItem("auth-token")
+const getRegisteredUsers = (): User[] => getItem<User[]>("registered-users") || []
+const setRegisteredUsers = (users: User[]): void => setItem("registered-users", users)
+
+// Admin credentials
+const ADMIN_EMAIL = "admin@foodbridge.org"
+const ADMIN_PASSWORD = "123456"
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -83,6 +91,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (storedUser) {
         setUser(storedUser)
       }
+
+      // Initialize admin user if not exists
+      const users = getRegisteredUsers()
+      const adminExists = users.some((u) => u.email === ADMIN_EMAIL)
+
+      if (!adminExists) {
+        // Create admin user
+        const adminUser: User = {
+          id: "admin_" + Date.now(),
+          name: "Admin",
+          email: ADMIN_EMAIL,
+          role: "admin",
+          createdAt: new Date().toISOString(),
+        }
+
+        setRegisteredUsers([...users, adminUser])
+      }
     } catch (error) {
       console.error("Error initializing auth state:", error)
     } finally {
@@ -91,36 +116,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = async (email: string, password: string, role: string) => {
+  const login = async (email: string, password: string) => {
     try {
-      // In a real app, this would be an API call
-      // For now, we'll simulate a successful login
+      // Get registered users
+      const registeredUsers = getRegisteredUsers()
 
-      // Check if email contains "@" for basic validation
-      if (!email.includes("@")) {
-        return { success: false, message: "Invalid email format" }
+      // Find user by email
+      const foundUser = registeredUsers.find((u) => u.email === email)
+
+      // If user not found, redirect to signup
+      if (!foundUser) {
+        return {
+          success: false,
+          message: "User not registered. Please sign up first.",
+          redirect: "/signup",
+        }
       }
 
-      // Check if password is at least 6 characters
+      // In a real app, you would verify the password here
+      // For this demo, we'll just check if the password is at least 6 characters
       if (password.length < 6) {
-        return { success: false, message: "Password must be at least 6 characters" }
+        return { success: false, message: "Invalid password. Password must be at least 6 characters." }
       }
 
-      // Create a mock user
-      const newUser: User = {
-        id: `user_${Date.now()}`,
-        name: email.split("@")[0], // Use part of email as name
-        email,
-        role: role as UserRole,
-        createdAt: new Date().toISOString(),
-      }
-
-      // Store in localStorage
+      // Store auth token
       setAuthToken(`mock_token_${Date.now()}`)
-      setCurrentUser(newUser)
+
+      // Set current user
+      setCurrentUser(foundUser)
 
       // Update state
-      setUser(newUser)
+      setUser(foundUser)
 
       return { success: true, message: "Login successful" }
     } catch (error) {
@@ -129,10 +155,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Modify the adminLogin function to redirect to admin dashboard
+  const adminLogin = async (email: string, password: string) => {
+    try {
+      // Check admin credentials
+      if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+        return { success: false, message: "Invalid admin credentials" }
+      }
+
+      // Get registered users
+      const registeredUsers = getRegisteredUsers()
+
+      // Find admin user
+      const adminUser = registeredUsers.find((u) => u.email === ADMIN_EMAIL)
+
+      if (!adminUser) {
+        return { success: false, message: "Admin account not found" }
+      }
+
+      // Store auth token
+      setAuthToken(`admin_token_${Date.now()}`)
+
+      // Set current user
+      setCurrentUser(adminUser)
+
+      // Update state
+      setUser(adminUser)
+
+      return { success: true, message: "Admin login successful", redirect: "/admin" }
+    } catch (error) {
+      console.error("Admin login error:", error)
+      return { success: false, message: "An error occurred during admin login" }
+    }
+  }
+
   const signup = async (name: string, email: string, password: string, role: string) => {
     try {
-      // In a real app, this would be an API call
-      // For now, we'll simulate a successful signup
+      // Get registered users
+      const registeredUsers = getRegisteredUsers()
+
+      // Check if email is already registered
+      if (registeredUsers.some((u) => u.email === email)) {
+        return { success: false, message: "Email already registered. Please log in." }
+      }
 
       // Check if email contains "@" for basic validation
       if (!email.includes("@")) {
@@ -153,8 +218,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       }
 
-      // Store in localStorage
+      // Add user to registered users
+      setRegisteredUsers([...registeredUsers, newUser])
+
+      // Store auth token
       setAuthToken(`mock_token_${Date.now()}`)
+
+      // Set current user
       setCurrentUser(newUser)
 
       // Update state
@@ -185,7 +255,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, signup, logout, isAuthorized }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        login,
+        signup,
+        adminLogin,
+        logout,
+        isAuthorized,
+        getRegisteredUsers,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

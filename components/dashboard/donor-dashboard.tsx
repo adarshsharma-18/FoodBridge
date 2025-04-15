@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { motion } from "framer-motion"
@@ -10,48 +10,93 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { ArrowRight, Gift, Award, TrendingUp, MapPin, Calendar, BarChart3 } from "lucide-react"
+import { getDonationsByUser } from "@/lib/storage"
+import { useAuth } from "@/contexts/auth-context"
 
 interface DonorDashboardProps {
   userName: string
 }
 
 export function DonorDashboard({ userName }: DonorDashboardProps) {
+  const { user } = useAuth()
   const [points, setPoints] = useState(350)
   const [level, setLevel] = useState("Silver")
   const nextLevel = "Gold"
   const pointsToNextLevel = 500 - points
   const progress = (points / 500) * 100
+  const [userDonations, setUserDonations] = useState<any[]>([])
 
-  // Mock data for donations
-  const recentDonations = [
-    {
-      id: "don123",
-      foodName: "Cooked Rice and Curry",
-      quantity: "5 kg",
-      date: "2 days ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      points: 50,
-    },
-    {
-      id: "don456",
-      foodName: "Fresh Vegetables",
-      quantity: "3 kg",
-      date: "1 week ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      points: 30,
-    },
-    {
-      id: "don789",
-      foodName: "Bread and Pastries",
-      quantity: "10 items",
-      date: "2 weeks ago",
-      status: "Collected",
-      statusColor: "text-green-600",
-      points: 25,
-    },
-  ]
+  // Load user donations
+  useEffect(() => {
+    if (user) {
+      const donations = getDonationsByUser(user.id)
+      setUserDonations(donations)
+    }
+  }, [user])
+
+  // Calculate impact metrics
+  const calculateImpact = () => {
+    // Extract quantities from donations
+    let totalKg = 0
+    let freshGoodKg = 0
+    let stapleKg = 0
+
+    userDonations.forEach((donation) => {
+      // Extract numeric value from quantity string (e.g., "5 kg" -> 5)
+      const match = donation.quantity.match(/(\d+)/)
+      if (match) {
+        const kg = Number.parseInt(match[0], 10)
+        totalKg += kg
+
+        if (donation.condition === "fresh" || donation.condition === "good") {
+          freshGoodKg += kg
+        } else if (donation.condition === "staple") {
+          stapleKg += kg
+        }
+      }
+    })
+
+    // Calculate metrics
+    const peopleFed = Math.round((freshGoodKg * 1000) / 700) // 700g per person per day
+    const biogasGenerated = Math.round((stapleKg / 1000) * 0.5 * 10) / 10 // 0.5 tons of biogas per ton of staple food
+
+    return {
+      totalKg,
+      peopleFed,
+      biogasGenerated,
+    }
+  }
+
+  const { totalKg, peopleFed, biogasGenerated } = calculateImpact()
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = Math.abs(now.getTime() - date.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return "Today"
+    if (diffDays === 1) return "Yesterday"
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString()
+  }
+
+  // Get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "text-amber-600"
+      case "assigned":
+        return "text-blue-600"
+      case "collected":
+        return "text-purple-600"
+      case "delivered":
+        return "text-green-600"
+      default:
+        return "text-gray-600"
+    }
+  }
 
   // Mock data for available coupons
   const availableCoupons = [
@@ -190,19 +235,19 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">25 kg</p>
+                      <p className="text-2xl font-bold text-blue-600">{totalKg} kg</p>
                       <p className="text-sm text-gray-500">Food Donated</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">50</p>
-                      <p className="text-sm text-gray-500">Meals Provided</p>
+                      <p className="text-2xl font-bold text-blue-600">{peopleFed}</p>
+                      <p className="text-sm text-gray-500">People Fed</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">15 kg</p>
-                      <p className="text-sm text-gray-500">CO₂ Saved</p>
+                      <p className="text-2xl font-bold text-blue-600">{biogasGenerated} tons</p>
+                      <p className="text-sm text-gray-500">Biogas Generated</p>
                     </div>
                     <div className="bg-blue-50 p-3 rounded-lg">
-                      <p className="text-2xl font-bold text-blue-600">5</p>
+                      <p className="text-2xl font-bold text-blue-600">{userDonations.length}</p>
                       <p className="text-sm text-gray-500">Donations</p>
                     </div>
                   </div>
@@ -242,7 +287,7 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
                     </Link>
                   </Button>
                   <Button asChild variant="outline" className="w-full">
-                    <Link href="/track">
+                    <Link href="/dashboard?tab=donations">
                       Track Donations <MapPin className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
@@ -254,64 +299,14 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
                 </div>
               </CardContent>
               <CardFooter>
-                <p className="text-xs text-gray-500 w-full text-center">Your last donation was 2 days ago</p>
+                <p className="text-xs text-gray-500 w-full text-center">
+                  {userDonations.length > 0
+                    ? `Your last donation was ${formatDate(userDonations[0].createdAt)}`
+                    : "No donations yet. Start donating today!"}
+                </p>
               </CardFooter>
             </Card>
           </motion.div>
-        </div>
-
-        <div className="mb-8">
-          <h2 className="text-xl font-bold mb-4">Recent Donations</h2>
-          <div className="space-y-4">
-            {recentDonations.map((donation, index) => (
-              <motion.div
-                key={donation.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.1 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{donation.foodName}</CardTitle>
-                        <CardDescription>{donation.date}</CardDescription>
-                      </div>
-                      <Badge className={`${donation.statusColor} bg-green-50`}>{donation.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{donation.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Points Earned</p>
-                        <p className="text-green-600">+{donation.points} points</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Impact</p>
-                        <p>~{Number.parseInt(donation.quantity) * 2} meals provided</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/donations/${donation.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-4 text-center">
-            <Button asChild variant="outline">
-              <Link href="/dashboard?tab=donations">
-                View All Donations <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
         </div>
       </TabsContent>
 
@@ -330,54 +325,77 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
           </div>
 
           <div className="space-y-6">
-            {[...recentDonations, ...recentDonations].map((donation, index) => (
-              <motion.div
-                key={`${donation.id}-${index}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.05 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{donation.foodName}</CardTitle>
-                        <CardDescription>Donation #{donation.id.slice(-3)}</CardDescription>
+            {userDonations.length > 0 ? (
+              userDonations.map((donation, index) => (
+                <motion.div
+                  key={`${donation.id}-${index}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.05 * index }}
+                >
+                  <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle>{donation.foodName}</CardTitle>
+                          <CardDescription>Donation #{donation.id.slice(-3)}</CardDescription>
+                        </div>
+                        <Badge className={`${getStatusColor(donation.status)} bg-green-50`}>
+                          {donation.status.charAt(0).toUpperCase() + donation.status.slice(1)}
+                        </Badge>
                       </div>
-                      <Badge className={`${donation.statusColor} bg-green-50`}>{donation.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{donation.quantity}</p>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Quantity</p>
+                          <p>{donation.quantity}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Date</p>
+                          <p>{formatDate(donation.createdAt)}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Points Earned</p>
+                          <p className="text-green-600">+{Math.floor(Number.parseInt(donation.quantity) * 5)} points</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Collected By</p>
+                          <p>{donation.collectedBy || (donation.assignedTo ? "Assigned" : "Pending")}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Date</p>
-                        <p>{donation.date}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Points Earned</p>
-                        <p className="text-green-600">+{donation.points} points</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Collected By</p>
-                        <p>Community Food Bank</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/track/${donation.id}`}>Track Donation</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/donations/${donation.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
+                    </CardContent>
+                    <CardFooter>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/track/${donation.id}`}>Track Donation</Link>
+                      </Button>
+                      <Button variant="ghost" size="sm" asChild className="ml-auto">
+                        <Link href={`/donations/${donation.id}`}>View Details</Link>
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </motion.div>
+              ))
+            ) : (
+              <Card className="border-none shadow-sm">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <div className="rounded-full bg-gray-100 p-3 mb-4">
+                    <Gift className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-medium mb-2">No Donations Yet</h3>
+                  <p className="text-gray-500 text-center mb-6 max-w-md">
+                    You haven't made any donations yet. Start donating surplus food to make a difference in your
+                    community.
+                  </p>
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
+                  >
+                    <Link href="/donate">Make Your First Donation</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </TabsContent>
@@ -577,7 +595,7 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
             <div className="space-y-4 pt-4">
               <div>
                 <p className="text-sm font-medium text-gray-500">Email</p>
-                <p>john.doe@example.com</p>
+                <p>{user?.email || "john.doe@example.com"}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Role</p>
@@ -585,11 +603,11 @@ export function DonorDashboard({ userName }: DonorDashboardProps) {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Member Since</p>
-                <p>January 15, 2023</p>
+                <p>{user ? new Date(user.createdAt).toLocaleDateString() : "January 15, 2023"}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Donations</p>
-                <p>5 donations</p>
+                <p>{userDonations.length} donations</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Points Earned</p>

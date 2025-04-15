@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { MapPin, Clock, Package, CheckCircle, Truck, AlertCircle } from "lucide-react"
 import {
   getCollectionsByDriver,
   getAvailableCollections,
@@ -14,13 +15,16 @@ import {
 } from "@/lib/storage"
 import { useAuth } from "@/contexts/auth-context"
 import { OpenMapsButton } from "@/components/open-maps-button"
-import { MapPin, Clock, Package, CheckCircle, Truck, AlertCircle } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 
-export function DriverDashboard({ userName }: { userName: string }) {
+interface DriverDashboardProps {
+  userName: string
+}
+
+export function DriverDashboard({ userName }: DriverDashboardProps) {
   const { user } = useAuth()
-  const [collections, setCollections] = useState<Collection[]>([])
-  const [availablePickups, setAvailablePickups] = useState<Collection[]>([])
+  const [collections, setCollections] = useState<any[]>([])
+  const [availablePickups, setAvailablePickups] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState("available")
   const [collectionDetails, setCollectionDetails] = useState<Record<string, any>>({})
 
