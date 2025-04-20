@@ -1,4 +1,4 @@
-"\"use client"
+"use client"
 
 // Type definitions
 export interface User {
@@ -22,11 +22,32 @@ export interface Donation {
   expiryDate?: string
   latitude?: string
   longitude?: string
-  status: "pending" | "assigned" | "collected" | "delivered" | "expired"
+  // Update status to include new waste-specific statuses
+  status:
+    | "pending"
+    | "assigned"
+    | "collected"
+    | "delivered"
+    | "expired"
+    | "awaiting_biogas_approval"
+    | "biogas_approved"
+    | "awaiting_driver"
+    | "driver_accepted"
   assignedTo?: string
   collectedBy?: string
+  donationType?: "regular" | "waste"
+  wasteCondition?: "edible" | "inedible"
+  // Add new fields for waste donation workflow
+  biogasPlantId?: string
+  biogasPlantName?: string
+  driverId?: string
+  driverName?: string
+  reviewedAt?: string
+  acceptedAt?: string
+  pickupScheduledFor?: string
 }
 
+// Update the Collection interface to include original NGO information
 export interface Collection {
   id: string
   donationId: string
@@ -39,6 +60,14 @@ export interface Collection {
   status: "requested" | "assigned" | "in-transit" | "completed" | "cancelled"
   createdAt: string
   completedAt?: string
+  // Add fields for tracking redirected donations
+  originalNgoId?: string
+  originalNgoName?: string
+  // Add fields for verification
+  verificationPhoto?: string // Changed to store reference ID instead of full data
+  verificationResult?: "edible" | "expired" | "inedible"
+  verificationImageId?: string
+  verificationConfidence?: number
 }
 
 // Storage keys
@@ -49,7 +78,7 @@ const STORAGE_KEYS = {
   COLLECTIONS: "foodbridge-collections",
 }
 
-// Helper functions
+// Helper functions with quota handling
 export function getItem<T>(key: string, defaultValue: T): T {
   if (typeof window === "undefined") return defaultValue
 
@@ -62,13 +91,66 @@ export function getItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-export function setItem<T>(key: string, value: T): void {
-  if (typeof window === "undefined") return
+export function setItem<T>(key: string, value: T): boolean {
+  if (typeof window === "undefined") return false
 
   try {
-    localStorage.setItem(key, JSON.stringify(value))
+    // Convert to string first to check size
+    const serialized = JSON.stringify(value)
+
+    // Check if we're approaching the quota limit (5MB is a safe estimate)
+    if (serialized.length > 4 * 1024 * 1024) {
+      console.warn(`Warning: Item size for ${key} is large (${Math.round(serialized.length / 1024)}KB)`)
+
+      // If it's collections or donations, try to optimize by removing old items
+      if (key === STORAGE_KEYS.COLLECTIONS || key === STORAGE_KEYS.DONATIONS) {
+        const items = value as any[]
+        if (items.length > 20) {
+          // Keep only the 20 most recent items
+          const sortedItems = [...items]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 20)
+
+          console.log(`Optimized storage: Reduced ${items.length} items to 20`)
+          localStorage.setItem(key, JSON.stringify(sortedItems))
+          return true
+        }
+      }
+    }
+
+    localStorage.setItem(key, serialized)
+    return true
   } catch (error) {
     console.error(`Error setting item in localStorage: ${key}`, error)
+
+    // If quota exceeded, try to clear some space
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      console.warn("Storage quota exceeded. Attempting to free up space...")
+
+      // Try to remove old data
+      try {
+        // For collections, keep only the most recent ones
+        if (key === STORAGE_KEYS.COLLECTIONS) {
+          const collections = getItem<Collection[]>(STORAGE_KEYS.COLLECTIONS, [])
+          if (collections.length > 10) {
+            // Keep only the 10 most recent collections
+            const recentCollections = [...collections]
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .slice(0, 10)
+
+            localStorage.setItem(STORAGE_KEYS.COLLECTIONS, JSON.stringify(recentCollections))
+            console.log("Cleared old collections to free up space")
+
+            // Try again with the original data
+            return setItem(key, value)
+          }
+        }
+      } catch (cleanupError) {
+        console.error("Failed to clean up storage:", cleanupError)
+      }
+    }
+
+    return false
   }
 }
 
@@ -116,18 +198,49 @@ export function setDonations(donations: Donation[]): void {
   setItem(STORAGE_KEYS.DONATIONS, donations)
 }
 
-export function addDonation(donation: Donation): void {
+// Update the existing addDonation function to handle the waste donation workflow
+export function addDonation(donation: Donation): Donation {
   const donations = getDonations()
-  setDonations([...donations, donation])
+
+  // Ensure all required fields are present
+  const validatedDonation = {
+    ...donation,
+    id: donation.id || `don_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    createdAt: donation.createdAt || new Date().toISOString(),
+  }
+
+  // Set the appropriate status for waste donations
+  if (validatedDonation.donationType === "waste") {
+    validatedDonation.status = "awaiting_biogas_approval"
+  } else {
+    validatedDonation.status = donation.status || "pending"
+  }
+
+  // Add the donation to storage
+  const success = setItem(STORAGE_KEYS.DONATIONS, [...donations, validatedDonation])
+
+  // Log for debugging
+  if (success) {
+    console.log("Donation added to storage:", validatedDonation)
+  } else {
+    console.error("Failed to add donation to storage due to quota limits")
+  }
+
+  return validatedDonation
 }
 
-export function updateDonation(updatedDonation: Donation): void {
+export function updateDonation(updatedDonation: Donation): boolean {
   const donations = getDonations()
   const index = donations.findIndex((d) => d.id === updatedDonation.id)
   if (index !== -1) {
-    donations[index] = updatedDonation
-    setDonations(donations)
+    // Ensure we preserve all fields from the updated donation
+    donations[index] = {
+      ...donations[index],
+      ...updatedDonation,
+    }
+    return setItem(STORAGE_KEYS.DONATIONS, donations)
   }
+  return false
 }
 
 export function removeDonation(id: string): void {
@@ -140,34 +253,45 @@ export function getCollections(): Collection[] {
   return getItem<Collection[]>(STORAGE_KEYS.COLLECTIONS, [])
 }
 
-export function setCollections(collections: Collection[]): void {
-  setItem(STORAGE_KEYS.COLLECTIONS, collections)
+export function setCollections(collections: Collection[]): boolean {
+  return setItem(STORAGE_KEYS.COLLECTIONS, collections)
 }
 
-export function addCollection(collection: Collection): void {
+export function addCollection(collection: Collection): boolean {
   let collections = getCollections()
   collections = [...collections, collection]
-  setCollections(collections)
+  const success = setCollections(collections)
 
   // Update the related donation status
-  const donations = getDonations()
-  const donationIndex = donations.findIndex((d) => d.id === collection.donationId)
-  if (donationIndex !== -1) {
-    donations[donationIndex].status = "assigned"
-    donations[donationIndex].assignedTo = collection.ngoId
-    setDonations(donations)
+  if (success) {
+    const donations = getDonations()
+    const donationIndex = donations.findIndex((d) => d.id === collection.donationId)
+    if (donationIndex !== -1) {
+      donations[donationIndex].status = "assigned"
+      donations[donationIndex].assignedTo = collection.ngoId
+      setDonations(donations)
+    }
   }
+
+  return success
 }
 
-export function updateCollection(updatedCollection: Collection): void {
+export function updateCollection(updatedCollection: Collection): boolean {
   const collections = getCollections()
   const index = collections.findIndex((c) => c.id === updatedCollection.id)
   if (index !== -1) {
+    // Optimize storage by not storing full image data in the collection
+    if (updatedCollection.verificationPhoto && updatedCollection.verificationPhoto.length > 1000) {
+      // If it's a data URL, just store a reference and keep the actual image in the image storage
+      console.log("Optimizing collection storage by removing full image data")
+      updatedCollection.verificationPhoto = updatedCollection.verificationImageId || "image_reference"
+    }
+
     collections[index] = updatedCollection
-    setCollections(collections)
+    const success = setCollections(collections)
 
     // Update the related donation status if needed
-    if (updatedCollection.status === "completed") {
+    if (success && updatedCollection.status === "completed") {
       const donations = getDonations()
       const donationIndex = donations.findIndex((d) => d.id === updatedCollection.donationId)
       if (donationIndex !== -1) {
@@ -175,7 +299,10 @@ export function updateCollection(updatedCollection: Collection): void {
         setDonations(donations)
       }
     }
+
+    return success
   }
+  return false
 }
 
 export function removeCollection(id: string): void {
@@ -295,4 +422,98 @@ export function getDonationById(id: string): Donation | undefined {
 
 export function getRegisteredUsers(): User[] {
   return getItem<User[]>("registered-users", [])
+}
+
+// Add a new function to get waste donations for a biogas plant
+export function getWasteDonationsForBiogasPlant(biogasPlantId: string): Donation[] {
+  const donations = getDonations()
+  return donations.filter(
+    (d) =>
+      d.donationType === "waste" &&
+      (d.biogasPlantId === biogasPlantId || (d.status === "awaiting_biogas_approval" && !d.biogasPlantId)),
+  )
+}
+
+// Add a function to get available waste donations for drivers
+export function getAvailableWasteDonationsForDrivers(): Donation[] {
+  const donations = getDonations()
+  return donations.filter((d) => d.donationType === "waste" && d.status === "biogas_approved" && !d.driverId)
+}
+
+// Add a function for biogas plants to approve waste donations
+export function approveDonationByBiogasPlant(
+  donationId: string,
+  biogasPlantId: string,
+  biogasPlantName: string,
+): Donation | null {
+  const donations = getDonations()
+  const donationIndex = donations.findIndex((d) => d.id === donationId)
+
+  if (donationIndex === -1) return null
+
+  const donation = donations[donationIndex]
+
+  if (donation.donationType !== "waste" || donation.status !== "awaiting_biogas_approval") {
+    return null
+  }
+
+  const updatedDonation: Donation = {
+    ...donation,
+    status: "biogas_approved",
+    biogasPlantId,
+    biogasPlantName,
+    reviewedAt: new Date().toISOString(),
+  }
+
+  donations[donationIndex] = updatedDonation
+  const success = setDonations(donations)
+
+  return success ? updatedDonation : null
+}
+
+// Add a function for drivers to accept waste donations
+export function acceptWasteDonationByDriver(donationId: string, driverId: string, driverName: string): Donation | null {
+  const donations = getDonations()
+  const donationIndex = donations.findIndex((d) => d.id === donationId)
+
+  if (donationIndex === -1) return null
+
+  const donation = donations[donationIndex]
+
+  if (donation.donationType !== "waste" || donation.status !== "biogas_approved") {
+    return null
+  }
+
+  const updatedDonation: Donation = {
+    ...donation,
+    status: "driver_accepted",
+    driverId,
+    driverName,
+    acceptedAt: new Date().toISOString(),
+  }
+
+  donations[donationIndex] = updatedDonation
+  const success = setDonations(donations)
+
+  return success ? updatedDonation : null
+}
+
+// Add this function to get available waste pickups
+export function getAvailableWastePickups(): Collection[] {
+  const donations = getDonations()
+  const wasteDonations = donations.filter(
+    (d) => d.donationType === "waste" && d.status === "biogas_approved" && !d.assignedTo,
+  )
+
+  // Create collection objects for waste donations
+  return wasteDonations.map((donation) => ({
+    id: `waste_col_${donation.id}`,
+    donationId: donation.id,
+    ngoId: "biogas_plant", // Placeholder for biogas plant ID
+    ngoName: "Biogas Plant Facility",
+    pickupTime: new Date().toISOString(),
+    status: "requested",
+    createdAt: new Date().toISOString(),
+    notes: `Waste food pickup (${donation.wasteCondition}) for biogas processing`,
+  }))
 }

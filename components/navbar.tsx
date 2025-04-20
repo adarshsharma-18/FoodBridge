@@ -14,8 +14,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Menu, X, User, LogOut, ChevronDown, Bell } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { NotificationBadge } from "@/components/notification-badge"
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -116,7 +116,7 @@ export function Navbar() {
                     Services <ChevronDown className="ml-1 h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    {/* Show donation option only for donors or admin */}
+                    {/* Show donation option only for donors */}
                     {(!user || user.role === "donor") && (
                       <DropdownMenuItem>
                         <Link href="/donate" className="w-full">
@@ -159,11 +159,7 @@ export function Navbar() {
                       size="icon"
                     >
                       <Bell className="h-5 w-5" />
-                      {notificationCount > 0 && (
-                        <Badge className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-red-500 text-white text-xs">
-                          {notificationCount}
-                        </Badge>
-                      )}
+                      <NotificationBadge className="absolute -top-1 -right-1 px-1.5 py-0.5 text-xs" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-80">
@@ -205,11 +201,13 @@ export function Navbar() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Link href="/dashboard" className="w-full flex items-center">
-                        <User className="mr-2 h-4 w-4" /> Dashboard
-                      </Link>
-                    </DropdownMenuItem>
+                    {user.role !== "admin" && (
+                      <DropdownMenuItem>
+                        <Link href="/dashboard" className="w-full flex items-center">
+                          <User className="mr-2 h-4 w-4" /> Dashboard
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                       <LogOut className="mr-2 h-4 w-4" /> Logout

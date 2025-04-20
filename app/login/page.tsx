@@ -140,11 +140,6 @@ export default function LoginPage() {
                 "Login"
               )}
             </Button>
-            <div className="mt-4 text-center">
-              <Link href="/admin/login" className="text-sm font-medium text-green-600 hover:text-green-500">
-                Admin Login
-              </Link>
-            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

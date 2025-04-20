@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { getDonations } from "@/lib/storage"
 import { toast } from "@/components/ui/use-toast"
+import { SearchIcon } from "@radix-ui/react-icons"
 
 export function DonationsTable() {
   const [donations, setDonations] = useState<any[]>([])
@@ -95,6 +96,11 @@ export function DonationsTable() {
     })
   }
 
+  const openPhotoModal = (photoUrl: string) => {
+    // Implement your photo modal logic here
+    console.log("Open photo modal with URL:", photoUrl)
+  }
+
   return (
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -159,6 +165,9 @@ export function DonationsTable() {
                   Location
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Verification
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -191,6 +200,25 @@ export function DonationsTable() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">{donation.address}</div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {donation.verificationPhoto ? (
+                        <div
+                          className="relative w-12 h-12 cursor-pointer"
+                          onClick={() => openPhotoModal(donation.verificationPhoto)}
+                        >
+                          <img
+                            src={donation.verificationPhoto || "/placeholder.svg"}
+                            alt="Verification"
+                            className="w-full h-full object-cover rounded-md"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30 opacity-0 hover:opacity-100 transition-opacity rounded-md">
+                            <SearchIcon className="h-5 w-5 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No photo</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <Button
                         variant="outline"
@@ -205,7 +233,7 @@ export function DonationsTable() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-sm text-gray-500">
                     No donations found
                   </td>
                 </tr>

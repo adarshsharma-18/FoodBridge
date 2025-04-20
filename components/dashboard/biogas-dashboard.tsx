@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, MapPin, Calendar, BarChart3, Leaf, Zap, CheckCircle } from "lucide-react"
+import { BiogasIncomingWaste } from "./biogas-incoming-waste"
 
 interface BiogasDashboardProps {
   userName: string
@@ -340,72 +341,7 @@ export function BiogasDashboard({ userName }: BiogasDashboardProps) {
       </TabsContent>
 
       <TabsContent value="incoming">
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Incoming Waste</h2>
-            <Button
-              asChild
-              className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
-            >
-              <Link href="/collect">
-                Collect More Waste <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-
-          <div className="space-y-6">
-            {[...incomingWaste, ...incomingWaste].map((waste, index) => (
-              <motion.div
-                key={`${waste.id}-${index}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.05 * index }}
-              >
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{waste.foodType}</CardTitle>
-                        <CardDescription>Waste ID: #{waste.id.slice(-3)}</CardDescription>
-                      </div>
-                      <Badge className={`${waste.statusColor} bg-amber-50`}>{waste.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Arrival Time</p>
-                        <p>{waste.arrivalTime}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Quantity</p>
-                        <p>{waste.quantity}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Source</p>
-                        <p>{waste.donorName}</p>
-                        <p className="text-xs text-gray-500">{waste.donorAddress}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Potential Output</p>
-                        <p>{Number.parseInt(waste.quantity) * 0.15} m³ biogas</p>
-                        <p className="text-xs text-gray-500">{Number.parseInt(waste.quantity) * 0.3} kWh electricity</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/track/${waste.id}`}>Track Delivery</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild className="ml-auto">
-                      <Link href={`/waste/${waste.id}`}>View Details</Link>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+        <BiogasIncomingWaste />
       </TabsContent>
 
       <TabsContent value="processed">

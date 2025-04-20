@@ -1,5 +1,4 @@
 import {
-  type Donation,
   type Collection,
   getDonations,
   getCollections,
@@ -14,16 +13,60 @@ import {
   getAssignedCollections,
 } from "@/lib/storage"
 
-// Donation services
-export const createDonation = (donationData: Omit<Donation, "id" | "createdAt" | "status">) => {
-  const newDonation: Donation = {
-    ...donationData,
-    id: `don_${Date.now()}`,
-    createdAt: new Date().toISOString(),
-    status: "pending",
+// Update the Donation interface to include the new fields
+export interface Donation {
+  id: string
+  foodName: string
+  foodType: string
+  quantity: string
+  condition: string
+  address: string
+  donorName: string
+  donorId: string
+  createdAt: string
+  expiryDate?: string
+  latitude?: string
+  longitude?: string
+  status: "pending" | "assigned" | "collected" | "delivered" | "expired"
+  assignedTo?: string
+  collectedBy?: string
+  donationType?: "regular" | "waste"
+  wasteCondition?: "edible" | "inedible"
+}
+
+// Update the createDonation function to properly direct donations based on type
+
+// Find the createDonation function and replace it with this improved version:
+export const createDonation = (donationData: Omit<Donation, "createdAt" | "status">) => {
+  // Determine the appropriate status and assignee based on donation type
+  let status: Donation["status"] = "pending"
+  let assignedTo: string | undefined = undefined
+
+  if (donationData.donationType === "waste") {
+    // For waste food, automatically assign to a biogas plant
+    status = "assigned"
+
+    // Determine which biogas plant based on waste condition
+    if (donationData.wasteCondition === "edible") {
+      assignedTo = "biogas_plant_edible"
+    } else {
+      assignedTo = "biogas_plant_inedible"
+    }
   }
 
+  const newDonation: Donation = {
+    ...donationData,
+    createdAt: new Date().toISOString(),
+    status: status,
+    assignedTo: assignedTo,
+  }
+
+  // Store the donation in local storage
   addDonation(newDonation)
+
+  // Log the donation for debugging
+  console.log("Donation created:", newDonation)
+
   return newDonation
 }
 

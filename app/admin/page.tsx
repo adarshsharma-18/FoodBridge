@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button"
 
 export default function AdminDashboardPage() {
   const router = useRouter()
-  const { user, isLoading } = useAuth()
+  const { user, isLoading, logout } = useAuth()
   const [pageLoading, setPageLoading] = useState(true)
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -76,8 +76,8 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold tracking-tighter text-gray-900">Admin Dashboard</h1>
             <p className="text-gray-500">Manage users, donations, and system settings</p>
           </div>
-          <Button variant="outline" onClick={() => router.push("/")}>
-            Back to Home
+          <Button variant="outline" onClick={() => logout()}>
+            Logout
           </Button>
         </div>
 

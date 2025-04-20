@@ -124,11 +124,6 @@ export default function SignupPage() {
             <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isSubmitting}>
               {isSubmitting ? "Creating account..." : "Sign Up"}
             </Button>
-            <div className="mt-4 text-center">
-              <Link href="/admin/login" className="text-sm font-medium text-green-600 hover:text-green-500">
-                Admin Login
-              </Link>
-            </div>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
