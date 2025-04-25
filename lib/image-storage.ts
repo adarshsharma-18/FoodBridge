@@ -15,8 +15,10 @@ export interface ImageRecord {
     width?: number
     height?: number
     mlAssessment?: {
-      condition: "edible" | "expired" | "inedible"
+      condition: "Fresh" | "Spoiled"
       confidence: number
+      foodType?: string
+      foodTypeConfidence?: number
       assessedAt: string
     }
   }
@@ -182,13 +184,17 @@ export function updateImageMetadata(id: string, metadata: Partial<ImageRecord["m
 // Store ML assessment result with an image
 export function storeMLAssessment(
   imageId: string,
-  condition: "edible" | "expired" | "inedible",
+  condition: "Fresh" | "Spoiled",
   confidence: number,
+  foodType?: string,
+  foodTypeConfidence?: number,
 ): ImageRecord | null {
   return updateImageMetadata(imageId, {
     mlAssessment: {
       condition,
       confidence,
+      foodType,
+      foodTypeConfidence,
       assessedAt: new Date().toISOString(),
     },
   })

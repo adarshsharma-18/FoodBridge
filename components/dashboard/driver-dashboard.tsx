@@ -40,7 +40,9 @@ export function DriverDashboard({ userName }: DriverDashboardProps) {
   const [photoModalOpen, setPhotoModalOpen] = useState(false)
   const [selectedCollection, setSelectedCollection] = useState<Collection | null>(null)
   const [verificationPhotos, setVerificationPhotos] = useState<Record<string, string>>({})
-  const [verificationResults, setVerificationResults] = useState<Record<string, "edible" | "expired" | "inedible">>({})
+  const [verificationResults, setVerificationResults] = useState<
+    Record<string, "edible" | "expired" | "inedible" | "Fresh" | "Spoiled">
+  >({})
   const [verificationImageIds, setVerificationImageIds] = useState<Record<string, string>>({})
   const [mlConfidences, setMlConfidences] = useState<Record<string, number>>({})
 
@@ -186,11 +188,13 @@ export function DriverDashboard({ userName }: DriverDashboardProps) {
     setPhotoModalOpen(true)
   }
 
+  // Update the handleVerificationComplete function to handle the new model output
   const handleVerificationComplete = async (
-    condition: "edible" | "expired" | "inedible",
+    condition: "Fresh" | "Spoiled",
     photoUrl: string,
     imageId: string,
     mlConfidence: number,
+    detectedFoodType?: string,
   ) => {
     if (!selectedCollection || !user) return
 
@@ -246,8 +250,9 @@ export function DriverDashboard({ userName }: DriverDashboardProps) {
           const updatedDonation: Donation = {
             ...donation,
             donationType: "waste",
-            wasteCondition: condition === "expired" ? "edible" : "inedible",
+            wasteCondition: "inedible", // All spoiled food is considered inedible
             status: "driver_accepted", // Mark as accepted by driver for biogas
+            detectedFoodType: detectedFoodType, // Store the detected food type
           }
           updateDonation(updatedDonation)
         }
@@ -320,8 +325,12 @@ export function DriverDashboard({ userName }: DriverDashboardProps) {
   const completedCollections = collections.filter((collection) => collection.status === "completed")
 
   // Get condition badge color
-  const getConditionBadge = (condition: "edible" | "expired" | "inedible") => {
+  const getConditionBadge = (condition: "edible" | "expired" | "inedible" | "Fresh" | "Spoiled") => {
     switch (condition) {
+      case "Fresh":
+        return { color: "bg-green-100 text-green-800", text: "Fresh" }
+      case "Spoiled":
+        return { color: "bg-red-100 text-red-800", text: "Spoiled" }
       case "edible":
         return { color: "bg-green-100 text-green-800", text: "Edible" }
       case "expired":

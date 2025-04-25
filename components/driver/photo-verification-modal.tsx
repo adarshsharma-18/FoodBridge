@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, X } from "lucide-react"
+import { Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, X, Loader2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,17 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { assessFoodCondition } from "@/lib/ml-service"
 import { addImage, fileToDataUrl, generateThumbnail, storeMLAssessment } from "@/lib/image-storage"
+import { loadModel, isModelLoaded } from "@/lib/ml/model-loader"
 
 interface PhotoVerificationModalProps {
   isOpen: boolean
   onClose: () => void
   onVerificationComplete: (
-    condition: "edible" | "expired" | "inedible",
+    condition: "Fresh" | "Spoiled",
     photoUrl: string,
     imageId: string,
     mlConfidence: number,
+    foodType?: string,
   ) => void
   donationDetails: {
     foodName: string
@@ -49,14 +51,35 @@ export function PhotoVerificationModal({
   const [isCapturing, setIsCapturing] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
-  const [assessmentResult, setAssessmentResult] = useState<"edible" | "expired" | "inedible" | null>(null)
+  const [assessmentResult, setAssessmentResult] = useState<"Fresh" | "Spoiled" | null>(null)
   const [assessmentConfidence, setAssessmentConfidence] = useState<number>(0)
-  const [manualSelection, setManualSelection] = useState<"edible" | "expired" | "inedible" | null>(null)
+  const [detectedFoodType, setDetectedFoodType] = useState<string | undefined>(undefined)
+  const [foodTypeConfidence, setFoodTypeConfidence] = useState<number | undefined>(undefined)
+  const [manualSelection, setManualSelection] = useState<"Fresh" | "Spoiled" | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [imageId, setImageId] = useState<string | null>(null)
+  const [isModelLoading, setIsModelLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  // Load the model when the modal opens
+  useEffect(() => {
+    if (isOpen && !isModelLoaded()) {
+      setIsModelLoading(true)
+      loadModel()
+        .then((success) => {
+          setIsModelLoading(false)
+          if (!success) {
+            setError("Failed to load the food freshness detection model. Using fallback assessment.")
+          }
+        })
+        .catch((err) => {
+          setIsModelLoading(false)
+          setError("Error loading the food freshness detection model: " + err.message)
+        })
+    }
+  }, [isOpen])
 
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -180,13 +203,18 @@ export function PhotoVerificationModal({
 
     try {
       // Call the ML service to assess food condition
-      const { condition, confidence } = await assessFoodCondition(photo, donationDetails.foodType)
+      const { condition, confidence, foodType, foodTypeConfidence } = await assessFoodCondition(
+        photo,
+        donationDetails.foodType,
+      )
       setAssessmentResult(condition)
       setAssessmentConfidence(confidence)
+      setDetectedFoodType(foodType)
+      setFoodTypeConfidence(foodTypeConfidence)
       setManualSelection(condition) // Set initial manual selection to match ML result
 
       // Store ML assessment result with the image
-      storeMLAssessment(imageId, condition, confidence)
+      storeMLAssessment(imageId, condition, confidence, foodType, foodTypeConfidence)
     } catch (err) {
       console.error("Error processing photo:", err)
       setError("Could not analyze the photo. Please select the food condition manually.")
@@ -202,6 +230,8 @@ export function PhotoVerificationModal({
     setPhoto(null)
     setAssessmentResult(null)
     setManualSelection(null)
+    setDetectedFoodType(undefined)
+    setFoodTypeConfidence(undefined)
     setError(null)
     setProcessingProgress(0)
     setImageId(null)
@@ -221,7 +251,7 @@ export function PhotoVerificationModal({
       return
     }
 
-    onVerificationComplete(finalCondition, photo, imageId, assessmentConfidence)
+    onVerificationComplete(finalCondition, photo, imageId, assessmentConfidence, detectedFoodType)
     resetPhoto()
     onClose()
   }
@@ -244,6 +274,14 @@ export function PhotoVerificationModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Model loading indicator */}
+          {isModelLoading && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+              <AlertDescription className="text-blue-800">Loading food freshness detection model...</AlertDescription>
+            </Alert>
+          )}
+
           {/* Photo display area */}
           <div className="border rounded-md overflow-hidden bg-gray-50 aspect-video flex items-center justify-center relative">
             {isCapturing ? (
@@ -306,34 +344,24 @@ export function PhotoVerificationModal({
           {assessmentResult && (
             <div className="space-y-4">
               <Alert
-                className={
-                  assessmentResult === "edible"
-                    ? "bg-green-50 border-green-200"
-                    : assessmentResult === "expired"
-                      ? "bg-amber-50 border-amber-200"
-                      : "bg-red-50 border-red-200"
-                }
+                className={assessmentResult === "Fresh" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}
               >
-                {assessmentResult === "edible" ? (
+                {assessmentResult === "Fresh" ? (
                   <CheckCircle className="h-4 w-4 text-green-600" />
                 ) : (
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTriangle className="h-4 w-4 text-red-600" />
                 )}
-                <AlertDescription
-                  className={
-                    assessmentResult === "edible"
-                      ? "text-green-800"
-                      : assessmentResult === "expired"
-                        ? "text-amber-800"
-                        : "text-red-800"
-                  }
-                >
-                  {assessmentResult === "edible"
-                    ? "Food appears to be in good condition and edible."
-                    : assessmentResult === "expired"
-                      ? "Food appears to be expired but suitable for biogas."
-                      : "Food appears to be inedible and should be sent to biogas."}
-                  <div className="mt-1 text-xs">Confidence: {Math.round(assessmentConfidence * 100)}%</div>
+                <AlertDescription className={assessmentResult === "Fresh" ? "text-green-800" : "text-red-800"}>
+                  {assessmentResult === "Fresh"
+                    ? "Food appears to be fresh and in good condition."
+                    : "Food appears to be spoiled and not suitable for consumption."}
+                  <div className="mt-1 text-xs">Confidence: {(assessmentConfidence * 100).toFixed(2)}%</div>
+                  {detectedFoodType && (
+                    <div className="mt-1 text-xs">
+                      Detected food type: {detectedFoodType}
+                      {foodTypeConfidence && ` (${(foodTypeConfidence * 100).toFixed(2)}% confidence)`}
+                    </div>
+                  )}
                 </AlertDescription>
               </Alert>
 
@@ -341,25 +369,19 @@ export function PhotoVerificationModal({
                 <Label>Confirm Food Condition:</Label>
                 <RadioGroup
                   value={manualSelection || ""}
-                  onValueChange={(value) => setManualSelection(value as "edible" | "expired" | "inedible")}
+                  onValueChange={(value) => setManualSelection(value as "Fresh" | "Spoiled")}
                   className="flex flex-col space-y-1"
                 >
                   <div className="flex items-center space-x-3">
-                    <RadioGroupItem value="edible" id="edible" />
-                    <Label htmlFor="edible" className="font-normal">
-                      Edible (Good condition, can be delivered to NGO)
+                    <RadioGroupItem value="Fresh" id="fresh" />
+                    <Label htmlFor="fresh" className="font-normal">
+                      Fresh (Good condition, can be delivered to NGO)
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3">
-                    <RadioGroupItem value="expired" id="expired" />
-                    <Label htmlFor="expired" className="font-normal">
-                      Expired (Not suitable for consumption, send to biogas)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <RadioGroupItem value="inedible" id="inedible" />
-                    <Label htmlFor="inedible" className="font-normal">
-                      Inedible (Spoiled/damaged, send to biogas)
+                    <RadioGroupItem value="Spoiled" id="spoiled" />
+                    <Label htmlFor="spoiled" className="font-normal">
+                      Spoiled (Not suitable for consumption, send to biogas)
                     </Label>
                   </div>
                 </RadioGroup>
