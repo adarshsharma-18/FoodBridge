@@ -1,99 +1,4 @@
-// Define notification types
-export type NotificationType = "food_condition" | "route_change" | "pickup_request" | "delivery_confirmation"
-
-export interface Notification {
-  id: string
-  userId: string
-  type: NotificationType
-  title: string
-  message: string
-  createdAt: string
-  read: boolean
-  metadata?: Record<string, any>
-}
-
-// Storage key for notifications
-const NOTIFICATIONS_STORAGE_KEY = "foodbridge-notifications"
-
-// Helper functions
-export function getNotifications(): Notification[] {
-  if (typeof window === "undefined") return []
-
-  try {
-    const notifications = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY)
-    return notifications ? JSON.parse(notifications) : []
-  } catch (error) {
-    console.error("Error getting notifications from storage:", error)
-    return []
-  }
-}
-
-export function storeNotifications(notifications: Notification[]): void {
-  if (typeof window === "undefined") return
-
-  try {
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications))
-  } catch (error) {
-    console.error("Error storing notifications:", error)
-  }
-}
-
-// Add a new notification
-export function addNotification(notification: Omit<Notification, "id" | "createdAt" | "read">): Notification {
-  const notifications = getNotifications()
-
-  const newNotification: Notification = {
-    ...notification,
-    id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    read: false,
-  }
-
-  storeNotifications([...notifications, newNotification])
-  return newNotification
-}
-
-// Get notifications for a user
-export function getUserNotifications(userId: string): Notification[] {
-  const notifications = getNotifications()
-  return notifications.filter((notification) => notification.userId === userId)
-}
-
-// Mark notification as read
-export function markNotificationAsRead(id: string): boolean {
-  const notifications = getNotifications()
-  const index = notifications.findIndex((notification) => notification.id === id)
-
-  if (index === -1) return false
-
-  notifications[index].read = true
-  storeNotifications(notifications)
-
-  return true
-}
-
-// Mark all notifications as read for a user
-export function markAllNotificationsAsRead(userId: string): void {
-  const notifications = getNotifications()
-  const updatedNotifications = notifications.map((notification) =>
-    notification.userId === userId ? { ...notification, read: true } : notification,
-  )
-
-  storeNotifications(updatedNotifications)
-}
-
-// Delete a notification
-export function deleteNotification(id: string): boolean {
-  const notifications = getNotifications()
-  const filteredNotifications = notifications.filter((notification) => notification.id !== id)
-
-  if (filteredNotifications.length !== notifications.length) {
-    storeNotifications(filteredNotifications)
-    return true
-  }
-
-  return false
-}
+import { addNotification, type Notification } from "./notification"
 
 /**
  * Send notification to NGO about food condition
@@ -105,7 +10,7 @@ export function deleteNotification(id: string): boolean {
 export function notifyNGO(
   ngoId: string,
   donationId: string,
-  condition: "edible" | "expired" | "inedible",
+  condition: "Fresh" | "Spoiled",
   isRedirected: boolean,
 ): Notification {
   let title: string
@@ -113,13 +18,13 @@ export function notifyNGO(
 
   if (isRedirected) {
     title = "Donation Redirected"
-    message = `Donation #${donationId.slice(-8)} has been redirected to a biogas plant due to ${condition} condition.`
-  } else if (condition === "edible") {
+    message = `Donation #${donationId.slice(-8)} has been redirected to a biogas plant due to Spoiled condition.`
+  } else if (condition === "Fresh") {
     title = "Food Condition Verified"
-    message = `Donation #${donationId.slice(-8)} has been verified as edible and is on its way to you.`
+    message = `Donation #${donationId.slice(-8)} has been verified as Fresh and is on its way to you.`
   } else {
     title = "Food Condition Alert"
-    message = `Donation #${donationId.slice(-8)} has been found to be in ${condition} condition.`
+    message = `Donation #${donationId.slice(-8)} has been found to be in Spoiled condition.`
   }
 
   return addNotification({
@@ -144,13 +49,13 @@ export function notifyNGO(
 export function notifyBiogasPlant(
   biogasPlantId: string,
   donationId: string,
-  condition: "expired" | "inedible",
+  condition: "Fresh" | "Spoiled",
 ): Notification {
   return addNotification({
     userId: biogasPlantId,
     type: "pickup_request",
     title: "New Waste Donation",
-    message: `A new ${condition} food donation #${donationId.slice(-8)} has been redirected to your facility.`,
+    message: `A new ${condition === "Fresh" ? "edible but expired" : "spoiled"} food donation #${donationId.slice(-8)} has been redirected to your facility.`,
     metadata: {
       donationId,
       condition,
@@ -159,17 +64,18 @@ export function notifyBiogasPlant(
 }
 
 /**
- * Send notification to driver about route change
+ * Send notification to driver about assigned pickup
  * @param driverId Driver identifier
  * @param donationId Donation identifier
- * @param newDestination New destination type
+ * @param destination Destination type
  */
 export function notifyDriver(driverId: string, donationId: string, destination: "ngo" | "biogas"): Notification {
+  const destinationText = destination === "ngo" ? "NGO" : "Biogas Plant"
   return addNotification({
     userId: driverId,
-    type: "route_change",
-    title: "Destination Updated",
-    message: `Donation #${donationId.slice(-8)} destination has been updated to ${destination === "ngo" ? "an NGO" : "a biogas plant"}.`,
+    type: "pickup_assigned",
+    title: "New Pickup Assigned",
+    message: `You have been assigned to pickup donation #${donationId.slice(-8)} for ${destinationText}.`,
     metadata: {
       donationId,
       destination,

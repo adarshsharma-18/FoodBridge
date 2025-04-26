@@ -1,41 +1,32 @@
-# Food Freshness Detection Model
+# Machine Learning Models
 
-This directory contains the machine learning model for food freshness detection.
+This directory contains the machine learning models used by the FoodBridge application.
 
-## Model Details
+## Models
 
-- **Model Name**: fruits_edible.onnx
-- **Original Format**: PyTorch
-- **Converted Format**: ONNX (Open Neural Network Exchange)
-- **Input Size**: 224x224 RGB image
-- **Output**: 
-  - Food type classification (9 classes)
-  - Freshness classification (2 classes: Fresh/Spoiled)
+### 1. fruits_edible.onnx
+Used for food freshness detection. Classifies food items as "Fresh" or "Spoiled".
 
-## Classes
+### 2. FoodResnet.onnx
+Used for food recognition. Classifies food items into 20 categories of Indian food.
 
-### Food Types
-- apple
-- banana
-- beetroot
-- carrot
-- cucumber
-- orange
-- potato
-- tomato
-- other
+## Adding the Real Models
 
-### Freshness States
-- Fresh
-- Spoiled
+The files in this directory are placeholders. To use the real models:
 
-## Usage
+1. For the FoodResnet model:
+   - Convert your Keras model to ONNX format using the TensorFlow-ONNX converter:
+     \`\`\`
+     python -m tf2onnx.convert --keras FoodResnet.keras --output FoodResnet.onnx
+     \`\`\`
+   - Place the converted ONNX model in this directory
 
-This model is loaded and used by the FoodBridge application to automatically detect food freshness during the driver's verification process.
-\`\`\`
+2. For other models:
+   - Follow similar conversion steps based on the original model format
+   - Place the converted ONNX models in this directory
 
-## 10. Create a placeholder model file
+## Model Usage
 
-```plaintext file="public/models/fruits_edible.onnx"
-# This is a placeholder for the actual ONNX model file
-# In a real implementation, this would be the converted PyTorch model
+These models are loaded and used by the application's ML services:
+- `lib/ml/food-recognition.ts` for food recognition
+- `lib/ml/model-inference.ts` for food freshness detection

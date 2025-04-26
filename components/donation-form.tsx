@@ -14,13 +14,15 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ImageIcon, AlertCircle, CheckCircle, Upload, Camera, Trash2 } from "lucide-react"
+import { ImageIcon, AlertCircle, CheckCircle, Upload, Camera, Trash2, Search } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { LocationPicker } from "./location-picker"
 import { useAuth } from "@/contexts/auth-context"
 import { addDonation } from "@/lib/storage"
 import { addImage, fileToDataUrl, generateThumbnail } from "@/lib/image-storage"
+// Add the import for the FoodAnalysisModal at the top of the file
+import { FoodAnalysisModal } from "./food-analysis-modal"
 
 // Update the form schema to include donationType and wasteCondition
 const formSchema = z.object({
@@ -132,6 +134,8 @@ export function DonationForm() {
   const [locationWarning, setLocationWarning] = useState<string | null>(null)
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([])
   const [isCapturing, setIsCapturing] = useState(false)
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false)
+  const [currentAnalysisImage, setCurrentAnalysisImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -188,6 +192,11 @@ export function DonationForm() {
           preview,
           uploading: false,
         })
+
+        // If this is the first image, offer to analyze it
+        if (i === 0) {
+          handleImageAnalysis(preview)
+        }
       } catch (error) {
         console.error("Error creating preview for file:", file.name, error)
       }
@@ -246,6 +255,9 @@ export function DonationForm() {
           uploading: false,
         },
       ])
+
+      // Offer to analyze the captured photo
+      handleCapturedPhotoAnalysis(dataUrl)
 
       stopCamera()
     }
@@ -371,6 +383,48 @@ export function DonationForm() {
     }
   }
 
+  const handleImageAnalysis = (imageUrl: string) => {
+    setCurrentAnalysisImage(imageUrl)
+    setShowAnalysisModal(true)
+  }
+
+  // Updated to handle all food information
+  const handleAnalysisConfirm = (foodInfo: {
+    foodName: string
+    foodType?: string
+    condition?: "fresh" | "good" | "staple"
+  }) => {
+    form.setValue("foodName", foodInfo.foodName)
+
+    // Set food type if available
+    if (foodInfo.foodType) {
+      form.setValue("foodType", mapFoodTypeToFormValue(foodInfo.foodType))
+    }
+
+    // Set condition if available
+    if (foodInfo.condition) {
+      form.setValue("condition", foodInfo.condition)
+    }
+  }
+
+  // Helper function to map food type categories to form values
+  const mapFoodTypeToFormValue = (foodType: string): string => {
+    const typeMap: Record<string, string> = {
+      "Ready-to-Eat Snacks": "packaged",
+      "Sweet Dishes": "bakery",
+      Beverages: "other",
+      "Street Food": "cooked",
+      "Cooked Food": "cooked",
+      Staples: "raw",
+    }
+
+    return typeMap[foodType] || "other"
+  }
+
+  const handleCapturedPhotoAnalysis = (dataUrl: string) => {
+    handleImageAnalysis(dataUrl)
+  }
+
   const prevStep = () => {
     setStep(step - 1)
   }
@@ -477,13 +531,24 @@ export function DonationForm() {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="absolute top-2 right-2 flex space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => handleImageAnalysis(image.preview)}
+                            className="bg-blue-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Analyze food"
+                          >
+                            <Search className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remove image"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -517,9 +582,10 @@ export function DonationForm() {
                   <SelectContent>
                     <SelectItem value="cooked">Cooked Food</SelectItem>
                     <SelectItem value="raw">Raw Vegetables/Fruits</SelectItem>
-                    <SelectItem value="packaged">Packaged Food</SelectItem>
-                    <SelectItem value="bakery">Bakery Items</SelectItem>
-                    <SelectItem value="dairy">Dairy Products</SelectItem>
+                    <SelectItem value="packaged">Ready-to-Eat Snacks</SelectItem>
+                    <SelectItem value="bakery">Sweet Dishes</SelectItem>
+                    <SelectItem value="beverages">Beverages</SelectItem>
+                    <SelectItem value="street">Street Food</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
@@ -556,19 +622,19 @@ export function DonationForm() {
                   <div className="flex items-center space-x-3">
                     <RadioGroupItem value="fresh" id="fresh" />
                     <Label htmlFor="fresh" className="font-normal">
-                      Fresh (Newly prepared, best quality)
+                      Fresh (Newly prepared, highest quality)
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3">
                     <RadioGroupItem value="good" id="good" />
                     <Label htmlFor="good" className="font-normal">
-                      Good (Still in good condition, safe to consume)
+                      Good (Slightly older but safe if stored properly)
                     </Label>
                   </div>
                   <div className="flex items-center space-x-3">
                     <RadioGroupItem value="staple" id="staple" />
                     <Label htmlFor="staple" className="font-normal">
-                      Staple (Dry goods, longer shelf life)
+                      Staple (Dry/long-shelf-life items)
                     </Label>
                   </div>
                 </RadioGroup>
@@ -826,6 +892,14 @@ export function DonationForm() {
               </Button>
             )}
           </div>
+          {currentAnalysisImage && (
+            <FoodAnalysisModal
+              imageUrl={currentAnalysisImage}
+              isOpen={showAnalysisModal}
+              onClose={() => setShowAnalysisModal(false)}
+              onConfirm={handleAnalysisConfirm}
+            />
+          )}
         </form>
       </CardContent>
     </Card>
