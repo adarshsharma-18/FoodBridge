@@ -30,6 +30,9 @@ let foodModelLoaded = false
 let foodModelLoading = false
 let foodModelError: Error | null = null
 
+// Flask server URL
+const FLASK_SERVER_URL = "http://localhost:5000"
+
 /**
  * Load the food recognition model
  */
@@ -50,17 +53,17 @@ export async function loadFoodRecognitionModel(): Promise<boolean> {
   try {
     foodModelLoading = true
 
-    // Simulate model loading time
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-
-    // In a real implementation, we would load the model here
-    // const session = await ort.InferenceSession.create(FOOD_RECOGNITION_MODEL);
+    // Check if the Flask server is running
+    const response = await fetch(`${FLASK_SERVER_URL}/health`)
+    if (!response.ok) {
+      throw new Error(`Flask server not available: ${response.statusText}`)
+    }
 
     foodModelLoaded = true
     foodModelLoading = false
     return true
   } catch (error) {
-    console.error("Error loading food recognition model:", error)
+    console.error("Error connecting to food recognition server:", error)
     foodModelError = error instanceof Error ? error : new Error(String(error))
     foodModelLoading = false
     return false
@@ -70,17 +73,13 @@ export async function loadFoodRecognitionModel(): Promise<boolean> {
 /**
  * Preprocess an image for the food recognition model
  */
-async function preprocessImageForFoodRecognition(imageUrl: string): Promise<{
-  tensor: Float32Array
-  width: number
-  height: number
-}> {
+async function preprocessImageForFoodRecognition(imageUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
       try {
-        // Create a canvas to resize and normalize the image
+        // Create a canvas to resize the image
         const canvas = document.createElement("canvas")
         const ctx = canvas.getContext("2d")
 
@@ -96,24 +95,9 @@ async function preprocessImageForFoodRecognition(imageUrl: string): Promise<{
         // Draw and resize the image
         ctx.drawImage(img, 0, 0, 224, 224)
 
-        // Get image data
-        const imageData = ctx.getImageData(0, 0, 224, 224)
-        const data = imageData.data
-
-        // Convert to RGB and normalize to [0, 1]
-        const tensor = new Float32Array(3 * 224 * 224)
-        for (let i = 0; i < 224 * 224; i++) {
-          // Convert from RGBA to RGB and normalize
-          tensor[i] = data[i * 4] / 255.0 // R
-          tensor[i + 224 * 224] = data[i * 4 + 1] / 255.0 // G
-          tensor[i + 2 * 224 * 224] = data[i * 4 + 2] / 255.0 // B
-        }
-
-        resolve({
-          tensor,
-          width: 224,
-          height: 224,
-        })
+        // Get base64 representation of the image
+        const base64Image = canvas.toDataURL("image/jpeg")
+        resolve(base64Image)
       } catch (error) {
         reject(error)
       }
@@ -131,34 +115,35 @@ export async function analyzeFoodImage(imageUrl: string): Promise<{ foodName: st
   // Ensure model is loaded
   const modelLoaded = await loadFoodRecognitionModel()
   if (!modelLoaded) {
-    throw new Error("Failed to load food recognition model")
+    throw new Error("Failed to connect to food recognition server")
   }
 
   try {
-    // Preprocess the image
-    await preprocessImageForFoodRecognition(imageUrl)
+    // Preprocess the image to get base64 representation
+    const base64Image = await preprocessImageForFoodRecognition(imageUrl)
 
-    // In a real implementation, we would run the model inference here
-    // const results = await session.run({ input: processedImage.tensor });
+    // Send the image to the Flask server for prediction
+    const response = await fetch(`${FLASK_SERVER_URL}/predict`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        image: base64Image,
+      }),
+    })
 
-    // Simulate model inference with random results
-    // In a real implementation, we would parse the model output
-    const simulateInference = () => {
-      // Simulate food type prediction
-      const classIndex = Math.floor(Math.random() * Object.keys(FOOD_CLASSES).length)
-      const foodName = FOOD_CLASSES[classIndex as keyof typeof FOOD_CLASSES]
-      const confidence = 0.7 + Math.random() * 0.3 // 70-100% confidence
-
-      return {
-        foodName,
-        confidence,
-      }
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.statusText}`)
     }
 
-    // Simulate processing delay
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    // Parse the response
+    const result = await response.json()
 
-    return simulateInference()
+    return {
+      foodName: result.foodName,
+      confidence: result.confidence,
+    }
   } catch (error) {
     console.error("Error during food recognition:", error)
     throw error
